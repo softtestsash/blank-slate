@@ -1,0 +1,141 @@
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Text } from 'react-native';
+
+import { NameAgeScreen } from '../screens/Onboarding/NameAgeScreen';
+import { CurrentWeightScreen } from '../screens/Onboarding/CurrentWeightScreen';
+import { TargetWeightScreen } from '../screens/Onboarding/TargetWeightScreen';
+import { DashboardScreen } from '../screens/DashboardScreen';
+import { RitualScreen } from '../screens/RitualScreen';
+import { RevealScreen } from '../screens/RevealScreen';
+import { useAppStore } from '../store/useAppStore';
+import { getProfile } from '../db/db';
+
+// ─── Navigator param lists ────────────────────────────────────────────────────
+
+export type OnboardingStackParamList = {
+  NameAge: undefined;
+  CurrentWeight: { name: string; age: number; sex: string };
+  TargetWeight: {
+    name: string;
+    age: number;
+    sex: string;
+    currentWeight: number;
+    unit: 'lbs' | 'kg';
+  };
+};
+
+type MainTabParamList = {
+  Dashboard: undefined;
+  Ritual: undefined;
+  Reveal: undefined;
+};
+
+// ─── Navigators ───────────────────────────────────────────────────────────────
+
+const OnboardingStack = createNativeStackNavigator<OnboardingStackParamList>();
+const MainTab = createBottomTabNavigator<MainTabParamList>();
+
+// ─── Tab icons (text-based, no icon library dep) ──────────────────────────────
+
+function tabIcon(route: string, focused: boolean): string {
+  const icons: Record<string, [string, string]> = {
+    Dashboard: ['◉', '○'],
+    Ritual:    ['☀', '☼'],
+    Reveal:    ['📬', '📭'],
+  };
+  const [active, inactive] = icons[route] ?? ['●', '○'];
+  return focused ? active : inactive;
+}
+
+// ─── Main Tabs ────────────────────────────────────────────────────────────────
+
+function MainTabs() {
+  return (
+    <MainTab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: '#0D0D1A',
+          borderTopColor: '#1A1A2E',
+          paddingBottom: 6,
+          height: 64,
+        },
+        tabBarActiveTintColor: '#42A5F5',
+        tabBarInactiveTintColor: '#555',
+        tabBarIcon: ({ focused }) => (
+          <Text style={{ fontSize: 18, color: focused ? '#42A5F5' : '#555' }}>
+            {tabIcon(route.name, focused)}
+          </Text>
+        ),
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+      })}
+    >
+      <MainTab.Screen name="Dashboard" component={DashboardScreen} />
+      <MainTab.Screen name="Ritual" component={RitualScreen} />
+      <MainTab.Screen
+        name="Reveal"
+        component={RevealScreen}
+        options={{ tabBarLabel: 'Sunday' }}
+      />
+    </MainTab.Navigator>
+  );
+}
+
+// ─── Onboarding Stack ─────────────────────────────────────────────────────────
+
+function OnboardingFlow() {
+  return (
+    <OnboardingStack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: '#0A0A0F' },
+        animation: 'slide_from_right',
+      }}
+    >
+      <OnboardingStack.Screen name="NameAge" component={NameAgeScreen} />
+      <OnboardingStack.Screen name="CurrentWeight" component={CurrentWeightScreen} />
+      <OnboardingStack.Screen name="TargetWeight" component={TargetWeightScreen} />
+    </OnboardingStack.Navigator>
+  );
+}
+
+// ─── Root Navigator ───────────────────────────────────────────────────────────
+
+export function AppNavigator() {
+  const [loading, setLoading] = useState(true);
+  const [hasOnboarded, setHasOnboarded] = useState(false);
+  const setProfile = useAppStore((s) => s.setProfile);
+
+  useEffect(() => {
+    async function bootstrap() {
+      const flag = await AsyncStorage.getItem('hasOnboarded');
+      if (flag === 'true') {
+        const profile = getProfile();
+        if (profile) setProfile(profile);
+        setHasOnboarded(true);
+      }
+      setLoading(false);
+    }
+    bootstrap();
+  }, []);
+
+  // Listen for profile being set (i.e. onboarding completion) to switch roots
+  const profile = useAppStore((s) => s.profile);
+  useEffect(() => {
+    if (profile) setHasOnboarded(true);
+  }, [profile]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0A0A0F', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator color="#42A5F5" />
+      </View>
+    );
+  }
+
+  return hasOnboarded ? <MainTabs /> : <OnboardingFlow />;
+}

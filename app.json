@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Blank Slate",
+    "slug": "blank-slate",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "blankslate",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.blankslate.app",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Blank Slate uses Bluetooth to connect to your smart scale.",
+        "NSBluetoothPeripheralUsageDescription": "Blank Slate uses Bluetooth to connect to your smart scale."
+      }
+    },
+    "android": {
+      "package": "com.blankslate.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0A0F"
+      },
+      "permissions": [
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": ["peripheral", "central"],
+          "bluetoothAlwaysPermission": "Allow Blank Slate to connect to your scale"
+        }
+      ]
+    ]
+  }
+}
