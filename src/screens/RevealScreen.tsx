@@ -14,7 +14,7 @@ import {
   format,
   differenceInHours,
   differenceInMinutes,
-} from 'date-fns';
+} from '../utils/dateUtils';
 import {
   getMeasurementsForWeek,
   getPriorWeeklySummary,
@@ -31,8 +31,8 @@ function isSunday(): boolean {
 
 function getWeekBounds(): { weekStart: string; weekEnd: string } {
   const now = new Date();
-  const start = startOfWeek(now, { weekStartsOn: 1 }); // Monday
-  const end = endOfWeek(now, { weekStartsOn: 1 });     // Sunday 23:59:59
+  const start = startOfWeek(now); // Monday
+  const end = endOfWeek(now);     // Sunday 23:59:59
   return {
     weekStart: start.toISOString(),
     weekEnd: end.toISOString(),
@@ -88,8 +88,8 @@ export function RevealScreen() {
   function buildRevealData(): RevealData {
     const profile = getProfile();
     const { weekStart, weekEnd } = getWeekBounds();
-    const weekStartLabel = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'MMM d');
-    const weekEndLabel = format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'MMM d');
+    const weekStartLabel = format(startOfWeek(new Date()), 'MMM d');
+    const weekEndLabel = format(endOfWeek(new Date()), 'MMM d');
 
     const measurements = getMeasurementsForWeek(weekStart, weekEnd);
     const count = measurements.length;

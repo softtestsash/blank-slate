@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { startOfWeek, format } from 'date-fns';
+import { startOfWeek, format } from '../utils/dateUtils';
 import { useAppStore } from '../store/useAppStore';
 import { StatusPulse } from '../components/StatusPulse';
 import { ConsistencyRing } from '../components/ConsistencyRing';
@@ -23,7 +23,7 @@ export function DashboardScreen() {
     useCallback(() => {
       // Recompute status every time tab is focused
       const now = new Date();
-      const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+      const weekStart = format(startOfWeek(now), 'yyyy-MM-dd');
       const streak = getCurrentStreak();
       const weeklyCount = getWeeklyWeighInCount(weekStart, now.toISOString());
       const consistency = Math.round((weeklyCount / 7) * 100);
@@ -36,7 +36,7 @@ export function DashboardScreen() {
   const greeting = profile?.name ? `Good morning, ${profile.name}.` : 'Good morning.';
 
   const weekLabel = format(
-    startOfWeek(new Date(), { weekStartsOn: 1 }),
+    startOfWeek(new Date()),
     "'Week of' MMM d"
   );
 
