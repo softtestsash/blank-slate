@@ -81,7 +81,7 @@ npm install
 
 ## Run in a Browser (Expo Web)
 
-Useful for quickly iterating on layout and non-BLE screens. Bluetooth is not available in the browser — the app will automatically use **mock mode** (a simulated scale reading fires after 2 seconds during the Ritual).
+Useful for quickly iterating on layout and non-BLE screens. Bluetooth and local storage are not available in the browser — the app will automatically use **mock mode** (a simulated scale reading fires after 2 seconds during the Ritual) and all screens render with empty/default data.
 
 ```bash
 npx expo start --web
@@ -89,7 +89,7 @@ npx expo start --web
 
 Then open `http://localhost:8081` in your browser.
 
-> **Note:** Some React Native Reanimated animations may behave slightly differently on web. The canonical experience is on-device.
+> **Note:** Web is a UI preview only. Data does not persist between page refreshes. The canonical experience is on-device via Expo Go or a dev build.
 
 ---
 
@@ -184,14 +184,20 @@ src/
 
 ## Mock Mode
 
-BLE mock mode is enabled automatically in development (`__DEV__ === true`). During the Ritual's "Awaiting Scale" step, a simulated stable reading fires after 2 seconds. To disable mock mode and test real hardware:
+BLE mock mode is enabled automatically when:
+- Running in `__DEV__` (Expo Go, local dev server)
+- Running on web (Bluetooth not available in browsers)
+- `react-native-ble-plx` native module is not found (Expo Go)
+
+During the Ritual's "Awaiting Scale" step, a simulated stable reading fires after 2 seconds. To test with a real physical scale, use a **dev build** (see Option B above) and disable mock mode:
 
 ```ts
 // src/services/bleListener.ts
-export let MOCK_MODE = false; // change __DEV__ to false
+export let MOCK_MODE = __DEV__ || BleManagerClass === null;
+//                     ↑ change to: false
 ```
 
-Or call `setMockMode(false)` at runtime from your dev menu.
+Or call `setMockMode(false)` from a debug menu at runtime.
 
 ---
 

@@ -1,5 +1,10 @@
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 import { SCHEMA } from './schema';
+
+// expo-sqlite runs on iOS and Android only.
+// On web we return safe empty defaults so the UI still renders for testing.
+const IS_NATIVE = Platform.OS !== 'web';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
@@ -11,8 +16,8 @@ export function getDB(): SQLite.SQLiteDatabase {
 }
 
 export function initDB(): void {
-  const db = getDB();
-  db.execSync(SCHEMA);
+  if (!IS_NATIVE) return;
+  getDB().execSync(SCHEMA);
 }
 
 // ─── User Profile ────────────────────────────────────────────────────────────
@@ -29,6 +34,7 @@ export interface UserProfile {
 }
 
 export function getProfile(): UserProfile | null {
+  if (!IS_NATIVE) return null;
   return getDB().getFirstSync<UserProfile>(
     'SELECT * FROM user_profile ORDER BY id DESC LIMIT 1'
   ) ?? null;
@@ -42,6 +48,7 @@ export function insertProfile(
   targetWeight: number,
   unit: 'lbs' | 'kg'
 ): void {
+  if (!IS_NATIVE) return;
   getDB().runSync(
     'INSERT INTO user_profile (name, sex, age, current_weight, target_weight, unit) VALUES (?, ?, ?, ?, ?, ?)',
     [name, sex, age, currentWeight, targetWeight, unit]
@@ -55,6 +62,7 @@ export function insertMeasurement(
   timestamp: string,
   ritualComplete: boolean
 ): number {
+  if (!IS_NATIVE) return -1;
   const result = getDB().runSync(
     'INSERT INTO measurements (raw_weight, timestamp, ritual_complete) VALUES (?, ?, ?)',
     [rawWeight, timestamp, ritualComplete ? 1 : 0]
@@ -63,6 +71,7 @@ export function insertMeasurement(
 }
 
 export function insertContextTags(measurementId: number, tags: string[]): void {
+  if (!IS_NATIVE) return;
   const db = getDB();
   for (const tag of tags) {
     db.runSync(
@@ -80,6 +89,7 @@ export interface MeasurementRow {
 }
 
 export function getLastNMeasurements(n: number): MeasurementRow[] {
+  if (!IS_NATIVE) return [];
   return getDB().getAllSync<MeasurementRow>(
     'SELECT * FROM measurements ORDER BY timestamp DESC LIMIT ?',
     [n]
@@ -91,6 +101,7 @@ export function getMeasurementsForWeek(
   weekStart: string,
   weekEnd: string
 ): MeasurementRow[] {
+  if (!IS_NATIVE) return [];
   return getDB().getAllSync<MeasurementRow>(
     "SELECT * FROM measurements WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp ASC",
     [weekStart, weekEnd]
@@ -106,6 +117,7 @@ export interface EMASnapshot {
 }
 
 export function insertEMASnapshot(emaValue: number): void {
+  if (!IS_NATIVE) return;
   getDB().runSync(
     'INSERT INTO ema_snapshots (ema_value) VALUES (?)',
     [emaValue]
@@ -113,6 +125,7 @@ export function insertEMASnapshot(emaValue: number): void {
 }
 
 export function getLastTwoEMASnapshots(): EMASnapshot[] {
+  if (!IS_NATIVE) return [];
   return getDB().getAllSync<EMASnapshot>(
     'SELECT * FROM ema_snapshots ORDER BY recorded_at DESC LIMIT 2'
   );
@@ -135,6 +148,7 @@ export function upsertWeeklySummary(
   deltaFromPrior: number | null,
   measurementCount: number
 ): void {
+  if (!IS_NATIVE) return;
   getDB().runSync(
     `INSERT INTO weekly_summaries (week_start, average_weight, delta_from_prior, measurement_count)
      VALUES (?, ?, ?, ?)
@@ -147,6 +161,7 @@ export function upsertWeeklySummary(
 }
 
 export function getPriorWeeklySummary(weekStart: string): WeeklySummary | null {
+  if (!IS_NATIVE) return null;
   return getDB().getFirstSync<WeeklySummary>(
     'SELECT * FROM weekly_summaries WHERE week_start < ? ORDER BY week_start DESC LIMIT 1',
     [weekStart]
@@ -164,6 +179,7 @@ export interface ChecklistItem {
 }
 
 export function getChecklistItems(): ChecklistItem[] {
+  if (!IS_NATIVE) return [];
   return getDB().getAllSync<ChecklistItem>(
     'SELECT * FROM checklist_items WHERE is_active = 1 ORDER BY sort_order ASC'
   );
@@ -177,6 +193,7 @@ export interface WeighInCount {
 
 // Returns number of distinct days with a measurement in the current week (Mon-today).
 export function getWeeklyWeighInCount(weekStart: string, now: string): number {
+  if (!IS_NATIVE) return 0;
   const row = getDB().getFirstSync<WeighInCount>(
     `SELECT COUNT(DISTINCT date(timestamp)) as count
      FROM measurements
@@ -188,6 +205,7 @@ export function getWeeklyWeighInCount(weekStart: string, now: string): number {
 
 // Returns current consecutive-day streak ending today.
 export function getCurrentStreak(): number {
+  if (!IS_NATIVE) return 0;
   const rows = getDB().getAllSync<{ day: string }>(
     `SELECT DISTINCT date(timestamp) as day
      FROM measurements
@@ -214,6 +232,7 @@ export function getCurrentStreak(): number {
 
 // Returns top N most-used tags this week.
 export function getTopTagsForWeek(weekStart: string, weekEnd: string, n = 3): string[] {
+  if (!IS_NATIVE) return [];
   const rows = getDB().getAllSync<{ tag: string }>(
     `SELECT ct.tag
      FROM context_tags ct

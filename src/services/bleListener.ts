@@ -1,4 +1,3 @@
-import { BleManager, Device, Characteristic } from 'react-native-ble-plx';
 import { Platform } from 'react-native';
 
 // ─── Renpho / QN-Scale BLE UUIDs ─────────────────────────────────────────────
@@ -6,11 +5,22 @@ import { Platform } from 'react-native';
 const SERVICE_UUID = '0000ffb0-0000-1000-8000-00805f9b34fb';
 const CHAR_UUID    = '0000ffb2-0000-1000-8000-00805f9b34fb';
 
-// ─── Mock Mode ────────────────────────────────────────────────────────────────
-// Set to true to simulate a scale reading without physical hardware.
-// Useful for development and UI testing.
+// ─── Lazy BLE load ────────────────────────────────────────────────────────────
+// react-native-ble-plx is a native module — not available in Expo Go or on web.
+// We require() at runtime so a missing module never crashes the JS bundle.
 
-export let MOCK_MODE = __DEV__;
+let BleManagerClass: (new () => any) | null = null;
+
+try {
+  BleManagerClass = require('react-native-ble-plx').BleManager;
+} catch {
+  // Running in Expo Go or web — MOCK_MODE will be forced on below.
+}
+
+// ─── Mock Mode ────────────────────────────────────────────────────────────────
+// Auto-enabled when BLE is unavailable (Expo Go / web) OR when __DEV__ is true.
+
+export let MOCK_MODE = __DEV__ || BleManagerClass === null;
 
 export function setMockMode(enabled: boolean): void {
   MOCK_MODE = enabled;
@@ -33,13 +43,14 @@ function base64ToBytes(b64: string): number[] {
 
 // ─── BLE Manager (singleton) ─────────────────────────────────────────────────
 
-let manager: BleManager | null = null;
-let activeDevice: Device | null = null;
+let manager: any | null = null;
+let activeDevice: any | null = null;
 let subscription: { remove: () => void } | null = null;
 
-function getManager(): BleManager {
+function getManager(): any {
   if (!manager) {
-    manager = new BleManager();
+    if (!BleManagerClass) throw new Error('BLE not available on this platform');
+    manager = new BleManagerClass();
   }
   return manager;
 }
@@ -105,7 +116,7 @@ export async function startScan(callbacks: BLECallbacks): Promise<void> {
   const ble = getManager();
   callbacks.onStatus('scanning');
 
-  ble.startDeviceScan([SERVICE_UUID], null, async (error, device) => {
+  ble.startDeviceScan([SERVICE_UUID], null, async (error: any, device: any) => {
     if (error) {
       callbacks.onError(error.message);
       callbacks.onStatus('error');
@@ -125,7 +136,7 @@ export async function startScan(callbacks: BLECallbacks): Promise<void> {
       subscription = activeDevice.monitorCharacteristicForService(
         SERVICE_UUID,
         CHAR_UUID,
-        (err: Error | null, char: Characteristic | null) => {
+        (err: any, char: any) => {
           if (err || !char?.value) return;
 
           const bytes = base64ToBytes(char.value);
