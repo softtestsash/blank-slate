@@ -17,6 +17,7 @@
     "@react-navigation/native": "^6.1.17",
     "@react-navigation/native-stack": "^6.9.26",
     "date-fns": "^3.6.0",
+    "eas-cli": "^18.1.0",
     "expo": "~54.0.0",
     "expo-dev-client": "~5.0.0",
     "expo-sqlite": "~15.1.4",

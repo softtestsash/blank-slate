@@ -11,7 +11,8 @@
       "bundleIdentifier": "com.blankslate.app",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Blank Slate uses Bluetooth to connect to your smart scale.",
-        "NSBluetoothPeripheralUsageDescription": "Blank Slate uses Bluetooth to connect to your smart scale."
+        "NSBluetoothPeripheralUsageDescription": "Blank Slate uses Bluetooth to connect to your smart scale.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -24,7 +25,10 @@
         "BLUETOOTH_ADMIN",
         "BLUETOOTH_SCAN",
         "BLUETOOTH_CONNECT",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT"
       ]
     },
     "plugins": [
@@ -33,10 +37,18 @@
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": false,
-          "modes": ["peripheral", "central"],
+          "modes": [
+            "peripheral",
+            "central"
+          ],
           "bluetoothAlwaysPermission": "Allow Blank Slate to connect to your scale"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1420de2e-235f-48f6-9f69-b6a43a05b12f"
+      }
+    }
   }
 }
