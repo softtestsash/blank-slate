@@ -1,30 +1,38 @@
-import { Platform } from 'react-native';
 import { SCHEMA } from './schema';
-
-const IS_NATIVE = Platform.OS !== 'web';
 
 // ─── Lazy-load expo-sqlite ────────────────────────────────────────────────────
 // Static import of expo-sqlite crashes on web ("Cannot find native module
-// 'ExpoSQLite'"). Use dynamic require, same pattern as bleListener.ts.
+// 'ExpoSQLite'"). Use dynamic require inside getDB() so no native code runs at
+// module initialization time — avoids PlatformConstants TurboModule timing
+// issues in Expo Go / React Native 0.76 New Architecture.
 
 let _SQLite: any = null;
-try {
-  if (IS_NATIVE) {
+let _sqliteLoaded = false;
+let _db: any = null;
+
+function loadSQLite(): boolean {
+  if (_sqliteLoaded) return _SQLite !== null;
+  _sqliteLoaded = true;
+  try {
+    // Platform must be checked at call-time, not module-init-time, so that
+    // TurboModules (PlatformConstants) are guaranteed to be available.
+    const { Platform } = require('react-native');
+    if (Platform.OS === 'web') {
+      console.log('[DB] web platform — SQLite disabled, all queries return defaults');
+      return false;
+    }
     _SQLite = require('expo-sqlite');
     console.log('[DB] expo-sqlite loaded');
-  } else {
-    console.log('[DB] web platform — SQLite disabled, all queries return defaults');
+    return true;
+  } catch (e) {
+    console.error('[DB] expo-sqlite failed to load:', e);
+    return false;
   }
-} catch (e) {
-  console.error('[DB] expo-sqlite failed to load:', e);
 }
-
-let _db: any = null;
 
 export function getDB(): any {
   if (!_db) {
-    if (!_SQLite) {
-      console.error('[DB] getDB called but expo-sqlite is not available');
+    if (!loadSQLite() || !_SQLite) {
       return null;
     }
     _db = _SQLite.openDatabaseSync('blankslate.db');
@@ -34,10 +42,6 @@ export function getDB(): any {
 }
 
 export function initDB(): void {
-  if (!IS_NATIVE) {
-    console.log('[DB] initDB skipped (web)');
-    return;
-  }
   try {
     console.log('[DB] running schema migration...');
     getDB()?.execSync(SCHEMA);
@@ -61,8 +65,7 @@ export interface UserProfile {
 }
 
 export function getProfile(): UserProfile | null {
-  if (!IS_NATIVE) return null;
-  return getDB().getFirstSync<UserProfile>(
+  return getDB()?.getFirstSync<UserProfile>(
     'SELECT * FROM user_profile ORDER BY id DESC LIMIT 1'
   ) ?? null;
 }
@@ -75,8 +78,7 @@ export function insertProfile(
   targetWeight: number,
   unit: 'lbs' | 'kg'
 ): void {
-  if (!IS_NATIVE) return;
-  getDB().runSync(
+  getDB()?.runSync(
     'INSERT INTO user_profile (name, sex, age, current_weight, target_weight, unit) VALUES (?, ?, ?, ?, ?, ?)',
     [name, sex, age, currentWeight, targetWeight, unit]
   );
@@ -89,8 +91,9 @@ export function insertMeasurement(
   timestamp: string,
   ritualComplete: boolean
 ): number {
-  if (!IS_NATIVE) return -1;
-  const result = getDB().runSync(
+  const db = getDB();
+  if (!db) return -1;
+  const result = db.runSync(
     'INSERT INTO measurements (raw_weight, timestamp, ritual_complete) VALUES (?, ?, ?)',
     [rawWeight, timestamp, ritualComplete ? 1 : 0]
   );
@@ -98,8 +101,8 @@ export function insertMeasurement(
 }
 
 export function insertContextTags(measurementId: number, tags: string[]): void {
-  if (!IS_NATIVE) return;
   const db = getDB();
+  if (!db) return;
   for (const tag of tags) {
     db.runSync(
       'INSERT INTO context_tags (measurement_id, tag) VALUES (?, ?)',
@@ -116,11 +119,10 @@ export interface MeasurementRow {
 }
 
 export function getLastNMeasurements(n: number): MeasurementRow[] {
-  if (!IS_NATIVE) return [];
-  return getDB().getAllSync<MeasurementRow>(
+  return getDB()?.getAllSync<MeasurementRow>(
     'SELECT * FROM measurements ORDER BY timestamp DESC LIMIT ?',
     [n]
-  );
+  ) ?? [];
 }
 
 // Measurements between two ISO dates (inclusive), for weekly reveal only.
@@ -128,11 +130,10 @@ export function getMeasurementsForWeek(
   weekStart: string,
   weekEnd: string
 ): MeasurementRow[] {
-  if (!IS_NATIVE) return [];
-  return getDB().getAllSync<MeasurementRow>(
+  return getDB()?.getAllSync<MeasurementRow>(
     "SELECT * FROM measurements WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp ASC",
     [weekStart, weekEnd]
-  );
+  ) ?? [];
 }
 
 // ─── EMA Snapshots ───────────────────────────────────────────────────────────
@@ -144,18 +145,16 @@ export interface EMASnapshot {
 }
 
 export function insertEMASnapshot(emaValue: number): void {
-  if (!IS_NATIVE) return;
-  getDB().runSync(
+  getDB()?.runSync(
     'INSERT INTO ema_snapshots (ema_value) VALUES (?)',
     [emaValue]
   );
 }
 
 export function getLastTwoEMASnapshots(): EMASnapshot[] {
-  if (!IS_NATIVE) return [];
-  return getDB().getAllSync<EMASnapshot>(
+  return getDB()?.getAllSync<EMASnapshot>(
     'SELECT * FROM ema_snapshots ORDER BY recorded_at DESC LIMIT 2'
-  );
+  ) ?? [];
 }
 
 // ─── Weekly Summaries ────────────────────────────────────────────────────────
@@ -175,8 +174,7 @@ export function upsertWeeklySummary(
   deltaFromPrior: number | null,
   measurementCount: number
 ): void {
-  if (!IS_NATIVE) return;
-  getDB().runSync(
+  getDB()?.runSync(
     `INSERT INTO weekly_summaries (week_start, average_weight, delta_from_prior, measurement_count)
      VALUES (?, ?, ?, ?)
      ON CONFLICT(week_start) DO UPDATE SET
@@ -188,8 +186,7 @@ export function upsertWeeklySummary(
 }
 
 export function getPriorWeeklySummary(weekStart: string): WeeklySummary | null {
-  if (!IS_NATIVE) return null;
-  return getDB().getFirstSync<WeeklySummary>(
+  return getDB()?.getFirstSync<WeeklySummary>(
     'SELECT * FROM weekly_summaries WHERE week_start < ? ORDER BY week_start DESC LIMIT 1',
     [weekStart]
   ) ?? null;
@@ -206,10 +203,9 @@ export interface ChecklistItem {
 }
 
 export function getChecklistItems(): ChecklistItem[] {
-  if (!IS_NATIVE) return [];
-  return getDB().getAllSync<ChecklistItem>(
+  return getDB()?.getAllSync<ChecklistItem>(
     'SELECT * FROM checklist_items WHERE is_active = 1 ORDER BY sort_order ASC'
-  );
+  ) ?? [];
 }
 
 // ─── Consistency / Streak Helpers ────────────────────────────────────────────
@@ -220,8 +216,7 @@ export interface WeighInCount {
 
 // Returns number of distinct days with a measurement in the current week (Mon-today).
 export function getWeeklyWeighInCount(weekStart: string, now: string): number {
-  if (!IS_NATIVE) return 0;
-  const row = getDB().getFirstSync<WeighInCount>(
+  const row = getDB()?.getFirstSync<WeighInCount>(
     `SELECT COUNT(DISTINCT date(timestamp)) as count
      FROM measurements
      WHERE timestamp >= ? AND timestamp <= ?`,
@@ -232,13 +227,12 @@ export function getWeeklyWeighInCount(weekStart: string, now: string): number {
 
 // Returns current consecutive-day streak ending today.
 export function getCurrentStreak(): number {
-  if (!IS_NATIVE) return 0;
-  const rows = getDB().getAllSync<{ day: string }>(
+  const rows: { day: string }[] = getDB()?.getAllSync<{ day: string }>(
     `SELECT DISTINCT date(timestamp) as day
      FROM measurements
      ORDER BY day DESC
      LIMIT 30`
-  );
+  ) ?? [];
   if (rows.length === 0) return 0;
 
   let streak = 0;
@@ -259,8 +253,7 @@ export function getCurrentStreak(): number {
 
 // Returns top N most-used tags this week.
 export function getTopTagsForWeek(weekStart: string, weekEnd: string, n = 3): string[] {
-  if (!IS_NATIVE) return [];
-  const rows = getDB().getAllSync<{ tag: string }>(
+  const rows: { tag: string }[] = getDB()?.getAllSync<{ tag: string }>(
     `SELECT ct.tag
      FROM context_tags ct
      JOIN measurements m ON ct.measurement_id = m.id
@@ -269,6 +262,6 @@ export function getTopTagsForWeek(weekStart: string, weekEnd: string, n = 3): st
      ORDER BY COUNT(*) DESC
      LIMIT ?`,
     [weekStart, weekEnd, n]
-  );
+  ) ?? [];
   return rows.map(r => r.tag);
 }

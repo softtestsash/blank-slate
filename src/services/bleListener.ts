@@ -1,5 +1,3 @@
-import { Platform } from 'react-native';
-
 // ─── Renpho / QN-Scale BLE UUIDs ─────────────────────────────────────────────
 
 const SERVICE_UUID = '0000ffb0-0000-1000-8000-00805f9b34fb';
@@ -7,24 +5,28 @@ const CHAR_UUID    = '0000ffb2-0000-1000-8000-00805f9b34fb';
 
 // ─── Lazy BLE load ────────────────────────────────────────────────────────────
 // react-native-ble-plx is a native module — not available in Expo Go or on web.
-// We require() at runtime so a missing module never crashes the JS bundle.
+// Deferred to call-time (not module-init-time) to avoid TurboModule timing
+// issues in React Native 0.76 New Architecture (PlatformConstants race).
 
 let BleManagerClass: (new () => any) | null = null;
+let _bleLoaded = false;
 
-try {
-  BleManagerClass = require('react-native-ble-plx').BleManager;
-} catch {
-  // Running in Expo Go or web — MOCK_MODE will be forced on below.
+function loadBLE(): void {
+  if (_bleLoaded) return;
+  _bleLoaded = true;
+  try {
+    BleManagerClass = require('react-native-ble-plx').BleManager;
+    console.log('[BLE] native module available: true');
+  } catch {
+    // Running in Expo Go or web — MOCK_MODE will be forced on below.
+    console.log('[BLE] native module available: false (Expo Go / web)');
+  }
 }
-
-console.log('[BLE] native module available:', BleManagerClass !== null);
 
 // ─── Mock Mode ────────────────────────────────────────────────────────────────
 // Auto-enabled when BLE is unavailable (Expo Go / web) OR when __DEV__ is true.
 
-export let MOCK_MODE = __DEV__ || BleManagerClass === null;
-
-console.log('[BLE] mock mode:', MOCK_MODE, '(__DEV__:', __DEV__, ')');
+export let MOCK_MODE = __DEV__;
 
 export function setMockMode(enabled: boolean): void {
   MOCK_MODE = enabled;
@@ -53,6 +55,7 @@ let subscription: { remove: () => void } | null = null;
 
 function getManager(): any {
   if (!manager) {
+    loadBLE();
     if (!BleManagerClass) throw new Error('BLE not available on this platform');
     manager = new BleManagerClass();
   }
@@ -99,8 +102,13 @@ export interface BLECallbacks {
  */
 export async function startScan(callbacks: BLECallbacks): Promise<void> {
   resetStable();
+  loadBLE();
 
-  if (MOCK_MODE) {
+  // MOCK_MODE is always true in __DEV__; also force it if BLE native module
+  // wasn't found (Expo Go / web).
+  const effectiveMock = MOCK_MODE || BleManagerClass === null;
+
+  if (effectiveMock) {
     callbacks.onStatus('scanning');
     // Simulate a 2-second scan then return a mock weight
     setTimeout(() => {
@@ -112,6 +120,7 @@ export async function startScan(callbacks: BLECallbacks): Promise<void> {
     return;
   }
 
+  const { Platform } = require('react-native');
   if (Platform.OS === 'android') {
     // Android 12+ needs BLUETOOTH_SCAN & BLUETOOTH_CONNECT at runtime.
     // Permissions are requested via app.json plugin config.
@@ -165,7 +174,7 @@ export async function startScan(callbacks: BLECallbacks): Promise<void> {
 }
 
 export function stopScan(): void {
-  if (!MOCK_MODE && manager) {
+  if (manager) {
     manager.stopDeviceScan();
   }
   subscription?.remove();
