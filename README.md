@@ -69,7 +69,6 @@ This is enforced at three layers:
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) 18 or later
-- [Expo CLI](https://docs.expo.dev/get-started/installation/): `npm install -g expo-cli`
 
 ```bash
 git clone <repo-url> blank-slate
@@ -79,75 +78,108 @@ npm install
 
 ---
 
-## Run in a Browser (Expo Web)
+## Why not Expo Go?
 
-Useful for quickly iterating on layout and non-BLE screens. Bluetooth and local storage are not available in the browser — the app will automatically use **mock mode** (a simulated scale reading fires after 2 seconds during the Ritual) and all screens render with empty/default data.
+**Expo Go does not work with this app** and will show a `PlatformConstants` TurboModule error. Two reasons:
+
+1. **react-native-ble-plx** is a custom native module. It is not bundled inside Expo Go.
+2. **SDK 54 uses the New Architecture (TurboModules)** by default. Expo Go's native binary must exactly match the SDK in use. Any version mismatch — even a single minor version — causes `TurboModuleRegistry.getEnforcing('PlatformConstants')` to throw before any screen renders.
+
+Use a **dev build** (below) or the **web preview** instead.
+
+---
+
+## Run in a Browser (UI Preview)
+
+Fastest way to iterate on layout. Bluetooth is unavailable in browsers — mock mode fires a simulated scale reading after 2 seconds. Data resets on page refresh.
 
 ```bash
 npx expo start --web
 ```
 
-Then open `http://localhost:8081` in your browser.
-
-> **Note:** Web is a UI preview only. Data does not persist between page refreshes. The canonical experience is on-device via Expo Go or a dev build.
+Open `http://localhost:8081`.
 
 ---
 
-## Run on iPhone
+## Run on iPhone — Development Build
 
-There are two ways depending on how much you need to test.
+A dev build is a custom native binary that matches your exact SDK and includes all native modules (Bluetooth, SQLite). It replaces Expo Go and supports live reload exactly the same way.
 
-### Option A — Expo Go (no Bluetooth, fastest setup)
+There are two paths: **local** (requires Mac + Xcode) or **cloud** (no Mac required, uses Expo's build service).
 
-Best for testing onboarding, dashboard, and reveal screens. Bluetooth is unavailable in Expo Go; the ritual will run in mock mode.
+---
 
-1. Install **Expo Go** from the App Store on your iPhone.
-2. Start the dev server:
-   ```bash
-   npx expo start
-   ```
-3. Open the Camera app on your iPhone and scan the QR code shown in the terminal.
-
-### Option B — Development Build (full Bluetooth support)
-
-Required to test actual BLE scale connections. You'll need a Mac with Xcode installed.
+### Option A — Local Build (Mac + Xcode)
 
 **Prerequisites:**
-- Xcode 15 or later (from the Mac App Store)
-- An Apple Developer account (free tier works for personal device testing)
-- iPhone connected via USB and trusted on your Mac
+- macOS with Xcode 15 or later
+- Apple Developer account (free tier works for personal device testing)
+- iPhone connected via USB and trusted
 
 **Steps:**
 
-1. Generate the native iOS project:
-   ```bash
-   npx expo prebuild --platform ios
-   ```
+```bash
+# 1. Generate native iOS project
+npx expo prebuild --platform ios
 
-2. Install iOS dependencies:
-   ```bash
-   cd ios && pod install && cd ..
-   ```
+# 2. Install native dependencies
+cd ios && pod install && cd ..
 
-3. Open the project in Xcode:
-   ```bash
-   open ios/BlankSlate.xcworkspace
-   ```
+# 3. Open in Xcode
+open ios/BlankSlate.xcworkspace
+```
 
-4. In Xcode:
-   - Select your iPhone as the target device (top toolbar)
-   - Go to **Signing & Capabilities** and select your Apple ID team
-   - Press **Run** (▶) or `Cmd + R`
+In Xcode:
+- Select your iPhone as the target (top toolbar)
+- Go to **Signing & Capabilities** → select your Apple ID team
+- Press **Run** (`Cmd + R`) — this compiles and installs the app on your phone
 
-5. Once installed, return to your terminal and start the JS bundler:
-   ```bash
-   npx expo start --dev-client
-   ```
-   Shake your iPhone or press the home button to open the Expo dev menu and connect to the bundler.
+```bash
+# 4. Once installed, start the JS bundler
+npm run dev
+```
 
-**Bluetooth permissions** are declared in `app.json` and will be requested automatically the first time the Ritual screen starts a scan.
+Shake your iPhone to open the Expo dev menu. The app will connect to your bundler automatically.
 
-> **Scale compatibility:** Tested against Renpho and QN-Scale devices using Service UUID `0000ffb0-0000-1000-8000-00805f9b34fb`. Other Bluetooth scales will not be detected.
+---
+
+### Option B — Cloud Build via EAS (no Mac required)
+
+[EAS Build](https://expo.dev/eas) compiles the native binary in Expo's cloud and emails you a link to install it on your iPhone. Free tier available.
+
+**Prerequisites:**
+- An [Expo account](https://expo.dev/signup) (free)
+- EAS CLI: `npm install -g eas-cli`
+
+**Steps:**
+
+```bash
+# 1. Log in
+eas login
+
+# 2. Configure your project (first time only)
+eas build:configure
+
+# 3. Build a development binary for iPhone
+eas build --profile development --platform ios
+```
+
+When the build finishes (~10–15 min), you'll get a QR code to install the `.ipa` on your device via the Expo website.
+
+```bash
+# 4. Start the JS bundler
+npm run dev
+```
+
+Scan the QR shown in the terminal from within the installed dev client app on your iPhone.
+
+> **Note:** For ad-hoc distribution (no TestFlight), register your iPhone's UDID in your Apple Developer account before building. EAS will guide you through this.
+
+---
+
+### Bluetooth Permissions
+
+Permissions are declared in `app.json` and requested automatically on first scan. The app targets Renpho and QN-Scale devices using Service UUID `0000ffb0-0000-1000-8000-00805f9b34fb`.
 
 ---
 
@@ -185,19 +217,18 @@ src/
 ## Mock Mode
 
 BLE mock mode is enabled automatically when:
-- Running in `__DEV__` (Expo Go, local dev server)
+- Running in `__DEV__` (local dev server)
 - Running on web (Bluetooth not available in browsers)
-- `react-native-ble-plx` native module is not found (Expo Go)
+- `react-native-ble-plx` native module is not found at call time
 
-During the Ritual's "Awaiting Scale" step, a simulated stable reading fires after 2 seconds. To test with a real physical scale, use a **dev build** (see Option B above) and disable mock mode:
+During the Ritual's "Awaiting Scale" step, a simulated stable reading fires after 2 seconds. To test with a real physical scale, use a **dev build** and set mock mode off:
 
 ```ts
 // src/services/bleListener.ts
-export let MOCK_MODE = __DEV__ || BleManagerClass === null;
-//                     ↑ change to: false
+export let MOCK_MODE = false; // was: __DEV__
 ```
 
-Or call `setMockMode(false)` from a debug menu at runtime.
+Or call `setMockMode(false)` at runtime (e.g. from a debug menu).
 
 ---
 

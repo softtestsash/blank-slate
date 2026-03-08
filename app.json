@@ -28,6 +28,7 @@
       ]
     },
     "plugins": [
+      "expo-dev-client",
       [
         "react-native-ble-plx",
         {
