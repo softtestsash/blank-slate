@@ -192,3 +192,69 @@ export let MOCK_MODE = false; // change __DEV__ to false
 ```
 
 Or call `setMockMode(false)` at runtime from your dev menu.
+
+---
+
+## Roadmap
+
+### v0.1 — Blind MVP &nbsp; ✅ &nbsp; *current*
+> Core loop: weigh in daily, see a color, get the number on Sunday.
+
+- [x] **Blind tracking** — Raw weight hidden every day; only trend status is shown
+- [x] **Status Pulse** — Goal-oriented color: Green (toward goal) · Yellow (away from goal) · Blue (plateau)
+- [x] **Morning Ritual** — Guided checklist before stepping on the scale for consistent conditions
+- [x] **Bluetooth scale support** — Renpho / QN-Scale BLE integration
+- [x] **Context tagging** — Log factors like salt, alcohol, workout, or poor sleep after each weigh-in
+- [x] **Consistency Ring** — Visual weigh-in streak for the week, no numbers shown
+- [x] **Weekly Reveal** — Sunday-only envelope that shows your week's average and progress toward goal
+- [x] **Onboarding** — Set name, age, sex, current weight, and goal weight on first launch
+
+---
+
+### v0.2 — Daily Companion &nbsp; 🔲 &nbsp; *next*
+> Make the app a reliable part of the morning routine.
+
+- [ ] **Daily reminder** — Configurable push notification at your preferred weigh-in time
+- [ ] **Profile editing** — Update name, goal weight, or unit (lbs/kg) after onboarding
+- [ ] **BLE error recovery** — Retry button and clearer status when the scale doesn't connect
+- [ ] **App icon & splash screen** — Polished first impression on the home screen
+- [ ] **Android permissions** — Graceful Bluetooth permission prompts on Android 12+
+
+---
+
+### v0.3 — Deeper Insight &nbsp; 🔲
+> Understand *why* the trend is moving, not just which direction.
+
+- [ ] **Tag correlation** — Show which context tags (e.g. alcohol, poor sleep) tend to precede upward swings
+- [ ] **Body composition** — Muscle % and fat % delta if your scale broadcasts it
+- [ ] **Reveal trend chart** — A simple weight-over-time sparkline, visible on the Sunday reveal only
+- [ ] **Monthly summary** — First-of-month view showing 4-week average and net change
+
+---
+
+### v0.4 — Ecosystem &nbsp; 🔲
+> Connect Blank Slate to the rest of your health data.
+
+- [ ] **Apple Health integration** — Write daily weigh-in to Health (opt-in)
+- [ ] **Multiple profiles** — Support for more than one person on a shared device
+- [ ] **Data export** — Download your full history as a CSV
+
+---
+
+### v1.0 — App Store &nbsp; 🔲
+> Ship it.
+
+- [ ] **iOS App Store** — Submission and review
+- [ ] **Google Play** — Submission and review
+- [ ] **Privacy policy** — Required for store listings
+- [ ] **iCloud backup** — Restore weekly summaries on a new device
+
+---
+
+### Backlog / Considering
+> Ideas on the radar — no timeline yet.
+
+- [ ] Apple Watch companion — glanceable pulse color on your wrist, no numbers
+- [ ] Home screen widget — streak count and pulse color only
+- [ ] AI-generated weekly note — pattern observations from tags + trend, no prescriptive advice
+- [ ] Customizable checklist items — add, remove, or reorder your morning ritual steps
