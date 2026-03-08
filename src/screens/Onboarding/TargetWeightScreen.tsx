@@ -13,6 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/AppNavigator';
 import { insertProfile, insertEMASnapshot, getProfile, UserProfile } from '../../db/db';
+import { useAppStore } from '../../store/useAppStore';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'TargetWeight'>;
 
