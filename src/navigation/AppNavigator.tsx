@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Text } from 'react-native';
 
 import { NameAgeScreen } from '../screens/Onboarding/NameAgeScreen';
 import { CurrentWeightScreen } from '../screens/Onboarding/CurrentWeightScreen';
@@ -112,13 +111,22 @@ export function AppNavigator() {
 
   useEffect(() => {
     async function bootstrap() {
-      const flag = await AsyncStorage.getItem('hasOnboarded');
-      if (flag === 'true') {
-        const profile = getProfile();
-        if (profile) setProfile(profile);
-        setHasOnboarded(true);
+      try {
+        console.log('[Nav] bootstrap start');
+        const flag = await AsyncStorage.getItem('hasOnboarded');
+        console.log('[Nav] hasOnboarded flag:', flag);
+        if (flag === 'true') {
+          const profile = getProfile();
+          console.log('[Nav] profile from DB:', profile?.name ?? 'null');
+          if (profile) setProfile(profile);
+          setHasOnboarded(true);
+        }
+      } catch (e) {
+        console.error('[Nav] bootstrap error:', e);
+      } finally {
+        setLoading(false);
+        console.log('[Nav] bootstrap complete');
       }
-      setLoading(false);
     }
     bootstrap();
   }, []);

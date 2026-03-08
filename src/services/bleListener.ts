@@ -17,10 +17,14 @@ try {
   // Running in Expo Go or web — MOCK_MODE will be forced on below.
 }
 
+console.log('[BLE] native module available:', BleManagerClass !== null);
+
 // ─── Mock Mode ────────────────────────────────────────────────────────────────
 // Auto-enabled when BLE is unavailable (Expo Go / web) OR when __DEV__ is true.
 
 export let MOCK_MODE = __DEV__ || BleManagerClass === null;
+
+console.log('[BLE] mock mode:', MOCK_MODE, '(__DEV__:', __DEV__, ')');
 
 export function setMockMode(enabled: boolean): void {
   MOCK_MODE = enabled;

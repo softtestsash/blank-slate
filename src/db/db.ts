@@ -1,23 +1,50 @@
-import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
 import { SCHEMA } from './schema';
 
-// expo-sqlite runs on iOS and Android only.
-// On web we return safe empty defaults so the UI still renders for testing.
 const IS_NATIVE = Platform.OS !== 'web';
 
-let _db: SQLite.SQLiteDatabase | null = null;
+// ─── Lazy-load expo-sqlite ────────────────────────────────────────────────────
+// Static import of expo-sqlite crashes on web ("Cannot find native module
+// 'ExpoSQLite'"). Use dynamic require, same pattern as bleListener.ts.
 
-export function getDB(): SQLite.SQLiteDatabase {
+let _SQLite: any = null;
+try {
+  if (IS_NATIVE) {
+    _SQLite = require('expo-sqlite');
+    console.log('[DB] expo-sqlite loaded');
+  } else {
+    console.log('[DB] web platform — SQLite disabled, all queries return defaults');
+  }
+} catch (e) {
+  console.error('[DB] expo-sqlite failed to load:', e);
+}
+
+let _db: any = null;
+
+export function getDB(): any {
   if (!_db) {
-    _db = SQLite.openDatabaseSync('blankslate.db');
+    if (!_SQLite) {
+      console.error('[DB] getDB called but expo-sqlite is not available');
+      return null;
+    }
+    _db = _SQLite.openDatabaseSync('blankslate.db');
+    console.log('[DB] blankslate.db opened');
   }
   return _db;
 }
 
 export function initDB(): void {
-  if (!IS_NATIVE) return;
-  getDB().execSync(SCHEMA);
+  if (!IS_NATIVE) {
+    console.log('[DB] initDB skipped (web)');
+    return;
+  }
+  try {
+    console.log('[DB] running schema migration...');
+    getDB()?.execSync(SCHEMA);
+    console.log('[DB] schema ready');
+  } catch (e) {
+    console.error('[DB] schema init error:', e);
+  }
 }
 
 // ─── User Profile ────────────────────────────────────────────────────────────
