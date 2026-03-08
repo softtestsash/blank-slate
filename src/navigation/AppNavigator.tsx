@@ -110,12 +110,23 @@ export function AppNavigator() {
   const setProfile = useAppStore((s) => s.setProfile);
 
   useEffect(() => {
+    // Safety net: if bootstrap hangs for any reason (AsyncStorage not ready,
+    // native module timing on first Expo Go load, etc.) force the spinner off
+    // after 5 s so the user isn't stuck on a blank screen.
+    const timeout = setTimeout(() => {
+      console.warn('[Nav] bootstrap timeout — forcing loading:false');
+      setLoading(false);
+    }, 5000);
+
     async function bootstrap() {
       try {
         console.log('[Nav] bootstrap start');
+        console.log('[Nav] calling AsyncStorage.getItem...');
         const flag = await AsyncStorage.getItem('hasOnboarded');
         console.log('[Nav] hasOnboarded flag:', flag);
+
         if (flag === 'true') {
+          console.log('[Nav] calling getProfile...');
           const profile = getProfile();
           console.log('[Nav] profile from DB:', profile?.name ?? 'null');
           if (profile) setProfile(profile);
@@ -124,11 +135,14 @@ export function AppNavigator() {
       } catch (e) {
         console.error('[Nav] bootstrap error:', e);
       } finally {
+        clearTimeout(timeout);
         setLoading(false);
         console.log('[Nav] bootstrap complete');
       }
     }
     bootstrap();
+
+    return () => clearTimeout(timeout);
   }, []);
 
   // Listen for profile being set (i.e. onboarding completion) to switch roots

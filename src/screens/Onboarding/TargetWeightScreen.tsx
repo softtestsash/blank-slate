@@ -12,9 +12,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/AppNavigator';
-import { insertProfile, insertEMASnapshot } from '../../db/db';
-import { useAppStore } from '../../store/useAppStore';
-import { getProfile } from '../../db/db';
+import { insertProfile, insertEMASnapshot, getProfile, UserProfile } from '../../db/db';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'TargetWeight'>;
 
@@ -43,18 +41,29 @@ export function TargetWeightScreen({ navigation, route }: Props) {
 
   async function handleFinish() {
     if (!canContinue) return;
+    console.log('[Onboarding] handleFinish — saving profile');
 
-    // Save profile
     insertProfile(name, sex, age, currentWeight, numericTarget, unit);
-    // Seed first EMA snapshot with current weight
     insertEMASnapshot(currentWeight);
-
-    // Mark onboarding complete
     await AsyncStorage.setItem('hasOnboarded', 'true');
 
-    // Hydrate store
-    const saved = getProfile();
-    if (saved) setProfile(saved);
+    // On native: read back the row we just inserted.
+    // On web: SQLite is disabled so getProfile() returns null — build the
+    // profile object directly from form data so the store still updates and
+    // AppNavigator switches to MainTabs.
+    const saved: UserProfile = getProfile() ?? {
+      id: 0,
+      name,
+      sex: sex as UserProfile['sex'],
+      age,
+      current_weight: currentWeight,
+      target_weight: numericTarget,
+      unit,
+      created_at: new Date().toISOString(),
+    };
+
+    console.log('[Onboarding] setProfile →', saved.name);
+    setProfile(saved);
   }
 
   return (
