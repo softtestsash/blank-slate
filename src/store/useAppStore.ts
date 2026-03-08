@@ -1,4 +1,11 @@
-import { create } from 'zustand';
+// Zero-dependency store — replaces zustand to avoid its ESM/import.meta
+// incompatibility with Metro's web bundler.
+//
+// API is intentionally compatible with the zustand usage in this codebase:
+//   useAppStore()           → returns full state (destructure freely)
+//   useAppStore(s => s.x)  → returns selected slice
+
+import React from 'react';
 import { UserProfile } from '../db/db';
 import { PulseStatus } from '../services/trendEngine';
 
@@ -14,82 +21,88 @@ export type RitualPhase =
 export interface StatusResult {
   status: PulseStatus;
   streak: number;
-  consistency: number; // 0–100
+  consistency: number;
 }
 
-// ─── Store Shape ─────────────────────────────────────────────────────────────
-
 interface AppState {
-  // ── Profile ──────────────────────────────────────────────────────────────
   profile: UserProfile | null;
-  setProfile: (p: UserProfile) => void;
-
-  // ── Status (never contains raw weight) ───────────────────────────────────
   statusResult: StatusResult;
-  setStatusResult: (r: StatusResult) => void;
-
-  // ── Ritual state machine ─────────────────────────────────────────────────
   ritualPhase: RitualPhase;
   checkedItems: Set<number>;
   selectedTags: string[];
+  pendingMeasurementId: number | null;
 
+  setProfile: (p: UserProfile) => void;
+  setStatusResult: (r: StatusResult) => void;
   setRitualPhase: (phase: RitualPhase) => void;
   toggleChecklistItem: (id: number) => void;
   toggleTag: (tag: string) => void;
   resetRitual: () => void;
-
-  // ── Pending measurement ID (set after BLE reading, cleared after tagging) -
-  pendingMeasurementId: number | null;
   setPendingMeasurementId: (id: number | null) => void;
 }
 
-// ─── Store ───────────────────────────────────────────────────────────────────
+// ─── Module-level singleton ───────────────────────────────────────────────────
 
-export const useAppStore = create<AppState>((set) => ({
-  // Profile
-  profile: null,
-  setProfile: (p) => set({ profile: p }),
-
-  // Status — default to BLUE (neutral/unknown) until first EMA is computed
-  statusResult: { status: 'BLUE', streak: 0, consistency: 0 },
-  setStatusResult: (r) => set({ statusResult: r }),
-
-  // Ritual
-  ritualPhase: 'IDLE',
+let _data = {
+  profile: null as UserProfile | null,
+  statusResult: { status: 'BLUE' as PulseStatus, streak: 0, consistency: 0 },
+  ritualPhase: 'IDLE' as RitualPhase,
   checkedItems: new Set<number>(),
-  selectedTags: [],
-  pendingMeasurementId: null,
+  selectedTags: [] as string[],
+  pendingMeasurementId: null as number | null,
+};
 
-  setRitualPhase: (phase) => set({ ritualPhase: phase }),
+const _listeners = new Set<() => void>();
 
-  toggleChecklistItem: (id) =>
-    set((state) => {
-      const next = new Set(state.checkedItems);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return { checkedItems: next };
-    }),
+function _set(partial: Partial<typeof _data>): void {
+  _data = { ..._data, ...partial };
+  _listeners.forEach((l) => l());
+}
 
-  toggleTag: (tag) =>
-    set((state) => {
-      const exists = state.selectedTags.includes(tag);
-      return {
-        selectedTags: exists
-          ? state.selectedTags.filter((t) => t !== tag)
-          : [...state.selectedTags, tag],
-      };
-    }),
+// ─── Stable action references ─────────────────────────────────────────────────
 
+const _actions = {
+  setProfile: (p: UserProfile) => _set({ profile: p }),
+  setStatusResult: (r: StatusResult) => _set({ statusResult: r }),
+  setRitualPhase: (phase: RitualPhase) => _set({ ritualPhase: phase }),
+  toggleChecklistItem: (id: number) => {
+    const next = new Set(_data.checkedItems);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    _set({ checkedItems: next });
+  },
+  toggleTag: (tag: string) => {
+    _set({
+      selectedTags: _data.selectedTags.includes(tag)
+        ? _data.selectedTags.filter((t) => t !== tag)
+        : [..._data.selectedTags, tag],
+    });
+  },
   resetRitual: () =>
-    set({
+    _set({
       ritualPhase: 'IDLE',
       checkedItems: new Set<number>(),
       selectedTags: [],
       pendingMeasurementId: null,
     }),
+  setPendingMeasurementId: (id: number | null) => _set({ pendingMeasurementId: id }),
+};
 
-  setPendingMeasurementId: (id) => set({ pendingMeasurementId: id }),
-}));
+function _snapshot(): AppState {
+  return { ..._data, ..._actions };
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useAppStore(): AppState;
+export function useAppStore<T>(selector: (s: AppState) => T): T;
+export function useAppStore<T>(selector?: (s: AppState) => T): AppState | T {
+  const [, rerender] = React.useReducer((n: number) => n + 1, 0);
+
+  React.useEffect(() => {
+    _listeners.add(rerender);
+    return () => { _listeners.delete(rerender); };
+  }, []);
+
+  const snap = _snapshot();
+  return selector ? selector(snap) : snap;
+}
