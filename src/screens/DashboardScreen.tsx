@@ -11,11 +11,8 @@ import { startOfWeek, format } from 'date-fns';
 import { useAppStore } from '../store/useAppStore';
 import { StatusPulse } from '../components/StatusPulse';
 import { ConsistencyRing } from '../components/ConsistencyRing';
-import {
-  getCurrentStatus,
-  getCurrentStreak,
-  getWeeklyWeighInCount,
-} from '../db/db';
+import { getCurrentStatus } from '../services/trendEngine';
+import { getCurrentStreak, getWeeklyWeighInCount } from '../db/db';
 
 // No weight values are imported or stored in this screen — Golden Rule enforced.
 
