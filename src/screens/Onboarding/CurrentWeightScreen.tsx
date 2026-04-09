@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/AppNavigator';
+import { colors, font } from '../../theme';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'CurrentWeight'>;
 
@@ -23,20 +19,11 @@ export function CurrentWeightScreen({ navigation, route }: Props) {
 
   function handleNext() {
     if (!canContinue) return;
-    navigation.navigate('TargetWeight', {
-      name,
-      age,
-      sex,
-      currentWeight: numericWeight,
-      unit,
-    });
+    navigation.navigate('TargetWeight', { name, age, sex, currentWeight: numericWeight, unit });
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.container}>
         <Text style={styles.step}>Step 2 of 3</Text>
         <Text style={styles.heading}>Where are you{'\n'}starting from?</Text>
@@ -51,9 +38,7 @@ export function CurrentWeightScreen({ navigation, route }: Props) {
               style={[styles.unitChip, unit === u && styles.unitChipActive]}
               onPress={() => setUnit(u)}
             >
-              <Text style={[styles.unitText, unit === u && styles.unitTextActive]}>
-                {u}
-              </Text>
+              <Text style={[styles.unitText, unit === u && styles.unitTextActive]}>{u}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -62,7 +47,7 @@ export function CurrentWeightScreen({ navigation, route }: Props) {
           <TextInput
             style={styles.input}
             placeholder={unit === 'lbs' ? '180' : '82'}
-            placeholderTextColor="#555"
+            placeholderTextColor={colors.textHint}
             value={weight}
             onChangeText={setWeight}
             keyboardType="decimal-pad"
@@ -73,8 +58,7 @@ export function CurrentWeightScreen({ navigation, route }: Props) {
 
         <TouchableOpacity
           style={[styles.button, !canContinue && styles.buttonDisabled]}
-          onPress={handleNext}
-          disabled={!canContinue}
+          onPress={handleNext} disabled={!canContinue}
         >
           <Text style={styles.buttonText}>Continue →</Text>
         </TouchableOpacity>
@@ -88,46 +72,40 @@ export function CurrentWeightScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#0A0A0F' },
+  flex: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1, padding: 28, justifyContent: 'center' },
-  step: { color: '#555', fontSize: 12, fontWeight: '600', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12 },
-  heading: { color: '#FFFFFF', fontSize: 30, fontWeight: '700', marginBottom: 10, lineHeight: 38 },
-  sub: { color: '#9E9E9E', fontSize: 15, lineHeight: 22, marginBottom: 36 },
+  step: { color: colors.textTertiary, fontSize: 11, fontFamily: font.bodySemiBold, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 12 },
+  heading: { color: colors.textPrimary, fontSize: 32, fontFamily: font.display, marginBottom: 10, lineHeight: 40 },
+  sub: { color: colors.textSecondary, fontSize: 15, fontFamily: font.body, lineHeight: 22, marginBottom: 36 },
   unitRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
   unitChip: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#2A2A3E',
-    backgroundColor: '#1A1A2E',
+    paddingHorizontal: 24, paddingVertical: 10,
+    borderRadius: 24, borderWidth: 1,
+    borderColor: colors.border, backgroundColor: colors.card,
   },
-  unitChipActive: { borderColor: '#42A5F5', backgroundColor: '#42A5F522' },
-  unitText: { color: '#9E9E9E', fontSize: 15, fontWeight: '600' },
-  unitTextActive: { color: '#42A5F5' },
+  unitChipActive: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  unitText: { color: colors.textSecondary, fontSize: 15, fontFamily: font.bodyMedium },
+  unitTextActive: { color: colors.accent },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   input: {
     flex: 1,
-    backgroundColor: '#1A1A2E',
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '700',
+    backgroundColor: colors.card,
+    color: colors.textPrimary,
+    fontSize: 48,
+    fontFamily: font.display,
     padding: 20,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#2A2A3E',
+    borderColor: colors.border,
     textAlign: 'center',
   },
-  unitSuffix: { color: '#555', fontSize: 20, fontWeight: '600' },
+  unitSuffix: { color: colors.textTertiary, fontSize: 20, fontFamily: font.displayItalic },
   button: {
-    backgroundColor: '#42A5F5',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 44,
+    backgroundColor: colors.accent, borderRadius: 14,
+    paddingVertical: 16, alignItems: 'center', marginTop: 44,
   },
-  buttonDisabled: { backgroundColor: '#1A2A3E', opacity: 0.6 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  buttonDisabled: { backgroundColor: colors.card, opacity: 0.5 },
+  buttonText: { color: colors.white, fontSize: 16, fontFamily: font.bodySemiBold },
   backLink: { alignItems: 'center', marginTop: 20 },
-  backText: { color: '#555', fontSize: 14 },
+  backText: { color: colors.textTertiary, fontSize: 14, fontFamily: font.body },
 });

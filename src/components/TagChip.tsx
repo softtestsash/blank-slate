@@ -1,5 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { colors, font } from '../theme';
 
 interface TagChipProps {
   tag: string;
@@ -16,9 +17,7 @@ export function TagChip({ tag, emoji, selected, onToggle }: TagChipProps) {
       activeOpacity={0.7}
     >
       <Text style={styles.emoji}>{emoji}</Text>
-      <Text style={[styles.label, selected && styles.labelSelected]}>
-        {tag}
-      </Text>
+      <Text style={[styles.label, selected && styles.labelSelected]}>{tag}</Text>
     </TouchableOpacity>
   );
 }
@@ -27,29 +26,30 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#2A2A3E',
-    backgroundColor: '#1A1A2E',
-    margin: 5,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    margin: 4,
   },
   chipSelected: {
-    borderColor: '#42A5F5',
-    backgroundColor: '#42A5F522',
+    borderColor: colors.accent,
+    backgroundColor: colors.accentDim,
   },
   emoji: {
-    fontSize: 16,
+    fontSize: 15,
     marginRight: 6,
   },
   label: {
-    color: '#9E9E9E',
-    fontSize: 14,
-    fontWeight: '500',
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontFamily: font.body,
     textTransform: 'capitalize',
   },
   labelSelected: {
-    color: '#42A5F5',
+    color: colors.accent,
+    fontFamily: font.bodyMedium,
   },
 });

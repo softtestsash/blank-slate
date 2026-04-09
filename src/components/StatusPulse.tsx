@@ -9,6 +9,7 @@ import Animated, {
   cancelAnimation,
 } from 'react-native-reanimated';
 import { PulseStatus } from '../services/trendEngine';
+import { colors, font } from '../theme';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -17,27 +18,26 @@ const STATUS_CONFIG: Record<
   { color: string; glow: string; duration: number; label: string }
 > = {
   GREEN: {
-    color: '#4CAF50',
-    glow: 'rgba(76, 175, 80, 0.25)',
-    duration: 3000,
-    label: 'Heading in the right direction',
+    color:    colors.green,
+    glow:     colors.greenGlow,
+    duration: 3200,
+    label:    'heading in the right direction',
   },
   YELLOW: {
-    color: '#FFC107',
-    glow: 'rgba(255, 193, 7, 0.25)',
-    duration: 1500,
-    label: 'Drifting from your goal',
+    color:    colors.yellow,
+    glow:     colors.yellowGlow,
+    duration: 1600,
+    label:    'drifting from your goal',
   },
   BLUE: {
-    color: '#42A5F5',
-    glow: 'rgba(66, 165, 245, 0.25)',
-    duration: 4000,
-    label: 'Holding steady — keep going',
+    color:    colors.blue,
+    glow:     colors.blueGlow,
+    duration: 4500,
+    label:    'holding steady — keep going',
   },
 };
 
-const CIRCLE_SIZE = 220;
-const GLOW_LAYERS = 3;
+const CIRCLE_SIZE = 200;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -46,68 +46,67 @@ interface StatusPulseProps {
 }
 
 export function StatusPulse({ status }: StatusPulseProps) {
-  const config = STATUS_CONFIG[status];
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(0.5);
+  const cfg = STATUS_CONFIG[status];
+
+  // Outer glow breathes slowly
+  const outerScale   = useSharedValue(1);
+  const outerOpacity = useSharedValue(0.3);
+  // Middle ring breathes at half speed
+  const midScale     = useSharedValue(1);
+  // Inner highlight pulses inversely
+  const innerOpacity = useSharedValue(1);
 
   useEffect(() => {
-    cancelAnimation(scale);
-    cancelAnimation(opacity);
+    cancelAnimation(outerScale);
+    cancelAnimation(outerOpacity);
+    cancelAnimation(midScale);
+    cancelAnimation(innerOpacity);
 
-    scale.value = withRepeat(
-      withTiming(1.12, {
-        duration: config.duration,
-        easing: Easing.inOut(Easing.sin),
-      }),
-      -1,
-      true
+    outerScale.value = withRepeat(
+      withTiming(1.18, { duration: cfg.duration, easing: Easing.inOut(Easing.sin) }),
+      -1, true
     );
-
-    opacity.value = withRepeat(
-      withTiming(1, {
-        duration: config.duration,
-        easing: Easing.inOut(Easing.sin),
-      }),
-      -1,
-      true
+    outerOpacity.value = withRepeat(
+      withTiming(0.85, { duration: cfg.duration, easing: Easing.inOut(Easing.sin) }),
+      -1, true
     );
-  }, [status, config.duration]);
+    midScale.value = withRepeat(
+      withTiming(1.09, { duration: cfg.duration * 1.3, easing: Easing.inOut(Easing.sin) }),
+      -1, true
+    );
+    innerOpacity.value = withRepeat(
+      withTiming(0.4, { duration: cfg.duration, easing: Easing.inOut(Easing.sin) }),
+      -1, true
+    );
+  }, [status, cfg.duration]);
 
-  const glowStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
+  const outerStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: outerScale.value }],
+    opacity: outerOpacity.value,
+  }));
+  const midStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: midScale.value }],
+  }));
+  const innerDotStyle = useAnimatedStyle(() => ({
+    opacity: innerOpacity.value,
   }));
 
   return (
     <View style={styles.container}>
-      {/* Layered glow rings */}
-      {Array.from({ length: GLOW_LAYERS }).map((_, i) => (
-        <Animated.View
-          key={i}
-          style={[
-            styles.glowRing,
-            {
-              width: CIRCLE_SIZE + i * 30,
-              height: CIRCLE_SIZE + i * 30,
-              borderRadius: (CIRCLE_SIZE + i * 30) / 2,
-              backgroundColor: config.glow,
-            },
-            i === 0 && glowStyle,
-          ]}
-        />
-      ))}
+      {/* Outer glow */}
+      <Animated.View style={[styles.outerGlow, { backgroundColor: cfg.glow }, outerStyle]} />
+      {/* Middle ring */}
+      <Animated.View style={[styles.midRing, { backgroundColor: cfg.glow }, midStyle]} />
 
       {/* Core circle */}
-      <View
-        style={[
-          styles.circle,
-          { backgroundColor: config.color + '22', borderColor: config.color },
-        ]}
-      >
-        <View style={[styles.innerDot, { backgroundColor: config.color }]} />
+      <View style={[styles.circle, { borderColor: cfg.color + '60', backgroundColor: cfg.color + '14' }]}>
+        {/* Bright center highlight */}
+        <Animated.View style={[styles.innerHighlight, { backgroundColor: cfg.color }, innerDotStyle]} />
+        {/* Solid core dot */}
+        <View style={[styles.coreDot, { backgroundColor: cfg.color }]} />
       </View>
 
-      <Text style={[styles.label, { color: config.color }]}>{config.label}</Text>
+      <Text style={[styles.label, { color: cfg.color }]}>{cfg.label}</Text>
     </View>
   );
 }
@@ -118,29 +117,46 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 32,
+    marginVertical: 28,
   },
-  glowRing: {
+  outerGlow: {
     position: 'absolute',
+    width:  CIRCLE_SIZE + 80,
+    height: CIRCLE_SIZE + 80,
+    borderRadius: (CIRCLE_SIZE + 80) / 2,
+  },
+  midRing: {
+    position: 'absolute',
+    width:  CIRCLE_SIZE + 36,
+    height: CIRCLE_SIZE + 36,
+    borderRadius: (CIRCLE_SIZE + 36) / 2,
+    opacity: 0.6,
   },
   circle: {
-    width: CIRCLE_SIZE,
+    width:  CIRCLE_SIZE,
     height: CIRCLE_SIZE,
     borderRadius: CIRCLE_SIZE / 2,
-    borderWidth: 2,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  innerDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  innerHighlight: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    opacity: 0.15,
+  },
+  coreDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
   },
   label: {
-    marginTop: 24,
-    fontSize: 16,
-    fontWeight: '500',
+    marginTop: 28,
+    fontSize: 18,
+    fontFamily: font.displayItalic,
     textAlign: 'center',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
 });

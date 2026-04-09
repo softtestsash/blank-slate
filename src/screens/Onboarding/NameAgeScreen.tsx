@@ -1,19 +1,13 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/AppNavigator';
+import { colors, font } from '../../theme';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'NameAge'>;
-
 type Sex = 'male' | 'female' | 'prefer_not_to_say';
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
@@ -31,22 +25,12 @@ export function NameAgeScreen({ navigation }: Props) {
 
   function handleNext() {
     if (!canContinue) return;
-    navigation.navigate('CurrentWeight', {
-      name: name.trim(),
-      age: parseInt(age, 10),
-      sex,
-    });
+    navigation.navigate('CurrentWeight', { name: name.trim(), age: parseInt(age, 10), sex });
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-      >
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.step}>Step 1 of 3</Text>
         <Text style={styles.heading}>Let's get started.</Text>
         <Text style={styles.sub}>
@@ -57,7 +41,7 @@ export function NameAgeScreen({ navigation }: Props) {
         <TextInput
           style={styles.input}
           placeholder="e.g. Alex"
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textHint}
           value={name}
           onChangeText={setName}
           autoFocus
@@ -68,7 +52,7 @@ export function NameAgeScreen({ navigation }: Props) {
         <TextInput
           style={styles.input}
           placeholder="e.g. 32"
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textHint}
           value={age}
           onChangeText={setAge}
           keyboardType="number-pad"
@@ -83,12 +67,7 @@ export function NameAgeScreen({ navigation }: Props) {
               style={[styles.sexChip, sex === opt.value && styles.sexChipActive]}
               onPress={() => setSex(opt.value)}
             >
-              <Text
-                style={[
-                  styles.sexChipText,
-                  sex === opt.value && styles.sexChipTextActive,
-                ]}
-              >
+              <Text style={[styles.sexChipText, sex === opt.value && styles.sexChipTextActive]}>
                 {opt.label}
               </Text>
             </TouchableOpacity>
@@ -97,8 +76,7 @@ export function NameAgeScreen({ navigation }: Props) {
 
         <TouchableOpacity
           style={[styles.button, !canContinue && styles.buttonDisabled]}
-          onPress={handleNext}
-          disabled={!canContinue}
+          onPress={handleNext} disabled={!canContinue}
         >
           <Text style={styles.buttonText}>Continue →</Text>
         </TouchableOpacity>
@@ -108,44 +86,35 @@ export function NameAgeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#0A0A0F' },
-  container: {
-    flexGrow: 1,
-    padding: 28,
-    justifyContent: 'center',
-  },
-  step: { color: '#555', fontSize: 12, fontWeight: '600', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12 },
-  heading: { color: '#FFFFFF', fontSize: 30, fontWeight: '700', marginBottom: 10 },
-  sub: { color: '#9E9E9E', fontSize: 15, lineHeight: 22, marginBottom: 36 },
-  fieldLabel: { color: '#9E9E9E', fontSize: 13, fontWeight: '600', marginBottom: 8, marginTop: 20 },
+  flex: { flex: 1, backgroundColor: colors.bg },
+  container: { flexGrow: 1, padding: 28, justifyContent: 'center' },
+  step: { color: colors.textTertiary, fontSize: 11, fontFamily: font.bodySemiBold, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 12 },
+  heading: { color: colors.textPrimary, fontSize: 32, fontFamily: font.display, marginBottom: 10 },
+  sub: { color: colors.textSecondary, fontSize: 15, fontFamily: font.body, lineHeight: 22, marginBottom: 36 },
+  fieldLabel: { color: colors.textSecondary, fontSize: 13, fontFamily: font.bodyMedium, marginBottom: 8, marginTop: 20 },
   input: {
-    backgroundColor: '#1A1A2E',
-    color: '#FFFFFF',
+    backgroundColor: colors.card,
+    color: colors.textPrimary,
     fontSize: 17,
+    fontFamily: font.body,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#2A2A3E',
+    borderColor: colors.border,
   },
   sexRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
   sexChip: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#2A2A3E',
-    backgroundColor: '#1A1A2E',
+    paddingHorizontal: 18, paddingVertical: 10,
+    borderRadius: 24, borderWidth: 1,
+    borderColor: colors.border, backgroundColor: colors.card,
   },
-  sexChipActive: { borderColor: '#42A5F5', backgroundColor: '#42A5F522' },
-  sexChipText: { color: '#9E9E9E', fontSize: 14 },
-  sexChipTextActive: { color: '#42A5F5', fontWeight: '600' },
+  sexChipActive: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  sexChipText: { color: colors.textSecondary, fontSize: 14, fontFamily: font.body },
+  sexChipTextActive: { color: colors.accent, fontFamily: font.bodyMedium },
   button: {
-    backgroundColor: '#42A5F5',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 44,
+    backgroundColor: colors.accent, borderRadius: 14,
+    paddingVertical: 16, alignItems: 'center', marginTop: 44,
   },
-  buttonDisabled: { backgroundColor: '#1A2A3E', opacity: 0.6 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  buttonDisabled: { backgroundColor: colors.card, opacity: 0.5 },
+  buttonText: { color: colors.white, fontSize: 16, fontFamily: font.bodySemiBold },
 });

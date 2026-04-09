@@ -14,13 +14,14 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/AppNavigator';
 import { insertProfile, insertEMASnapshot, getProfile, UserProfile } from '../../db/db';
 import { useAppStore } from '../../store/useAppStore';
+import { colors, font } from '../../theme';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'TargetWeight'>;
 
 const COLOR_LEGEND = [
-  { color: '#4CAF50', label: 'Green', desc: 'Moving toward your goal, or within 1 lb and stable' },
-  { color: '#FFC107', label: 'Yellow', desc: 'Drifting away from your target' },
-  { color: '#42A5F5', label: 'Blue', desc: 'Holding steady — progress is there, keep going' },
+  { color: colors.green, label: 'Green', desc: 'Moving toward your goal, or within 1 lb and stable' },
+  { color: colors.yellow, label: 'Amber', desc: 'Drifting away from your target' },
+  { color: colors.blue, label: 'Blue', desc: 'Holding steady — progress is there, keep going' },
 ];
 
 export function TargetWeightScreen({ navigation, route }: Props) {
@@ -34,10 +35,10 @@ export function TargetWeightScreen({ navigation, route }: Props) {
   const goalDirection =
     canContinue
       ? numericTarget < currentWeight
-        ? '↓ Lose weight'
+        ? '↓ lose weight'
         : numericTarget > currentWeight
-        ? '↑ Gain weight'
-        : '→ Maintain'
+        ? '↑ gain weight'
+        : '→ maintain'
       : null;
 
   async function handleFinish() {
@@ -48,10 +49,6 @@ export function TargetWeightScreen({ navigation, route }: Props) {
     insertEMASnapshot(currentWeight);
     await AsyncStorage.setItem('hasOnboarded', 'true');
 
-    // On native: read back the row we just inserted.
-    // On web: SQLite is disabled so getProfile() returns null — build the
-    // profile object directly from form data so the store still updates and
-    // AppNavigator switches to MainTabs.
     const saved: UserProfile = getProfile() ?? {
       id: 0,
       name,
@@ -86,7 +83,7 @@ export function TargetWeightScreen({ navigation, route }: Props) {
           <TextInput
             style={styles.input}
             placeholder={unit === 'lbs' ? '160' : '73'}
-            placeholderTextColor="#555"
+            placeholderTextColor={colors.textHint}
             value={target}
             onChangeText={setTarget}
             keyboardType="decimal-pad"
@@ -132,48 +129,48 @@ export function TargetWeightScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#0A0A0F' },
+  flex: { flex: 1, backgroundColor: colors.bg },
   container: { flexGrow: 1, padding: 28, justifyContent: 'center' },
-  step: { color: '#555', fontSize: 12, fontWeight: '600', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12 },
-  heading: { color: '#FFFFFF', fontSize: 30, fontWeight: '700', marginBottom: 10, lineHeight: 38 },
-  sub: { color: '#9E9E9E', fontSize: 15, lineHeight: 22, marginBottom: 28 },
+  step: { color: colors.textTertiary, fontSize: 11, fontFamily: font.bodySemiBold, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 12 },
+  heading: { color: colors.textPrimary, fontSize: 32, fontFamily: font.display, marginBottom: 10, lineHeight: 40 },
+  sub: { color: colors.textSecondary, fontSize: 15, fontFamily: font.body, lineHeight: 22, marginBottom: 28 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   input: {
     flex: 1,
-    backgroundColor: '#1A1A2E',
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '700',
+    backgroundColor: colors.card,
+    color: colors.textPrimary,
+    fontSize: 48,
+    fontFamily: font.display,
     padding: 20,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#2A2A3E',
+    borderColor: colors.border,
     textAlign: 'center',
   },
-  unitSuffix: { color: '#555', fontSize: 20, fontWeight: '600' },
-  goalHint: { color: '#9E9E9E', fontSize: 14, marginBottom: 28, fontStyle: 'italic' },
+  unitSuffix: { color: colors.textTertiary, fontSize: 20, fontFamily: font.displayItalic },
+  goalHint: { color: colors.textSecondary, fontSize: 14, fontFamily: font.displayItalic, marginBottom: 28 },
   legend: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 32,
     borderWidth: 1,
-    borderColor: '#2A2A3E',
+    borderColor: colors.border,
   },
-  legendTitle: { color: '#9E9E9E', fontSize: 12, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 16 },
+  legendTitle: { color: colors.textTertiary, fontSize: 11, fontFamily: font.bodySemiBold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 16 },
   legendRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
-  dot: { width: 12, height: 12, borderRadius: 6, marginTop: 3, marginRight: 12 },
+  dot: { width: 10, height: 10, borderRadius: 5, marginTop: 4, marginRight: 12 },
   legendText: { flex: 1 },
-  legendLabel: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
-  legendDesc: { color: '#757575', fontSize: 13, lineHeight: 18 },
+  legendLabel: { fontSize: 14, fontFamily: font.bodySemiBold, marginBottom: 2 },
+  legendDesc: { color: colors.textTertiary, fontSize: 13, fontFamily: font.body, lineHeight: 18 },
   button: {
-    backgroundColor: '#42A5F5',
+    backgroundColor: colors.accent,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
   },
-  buttonDisabled: { backgroundColor: '#1A2A3E', opacity: 0.6 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  buttonDisabled: { backgroundColor: colors.card, opacity: 0.5 },
+  buttonText: { color: colors.white, fontSize: 16, fontFamily: font.bodySemiBold },
   backLink: { alignItems: 'center', marginTop: 20 },
-  backText: { color: '#555', fontSize: 14 },
+  backText: { color: colors.textTertiary, fontSize: 14, fontFamily: font.body },
 });

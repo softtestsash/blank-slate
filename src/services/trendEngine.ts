@@ -101,6 +101,64 @@ export function getCurrentStatus(
   return { status, streak, consistency };
 }
 
+// ─── Coaching Explanations ────────────────────────────────────────────────────
+
+/**
+ * Generate a human-readable explanation of the current pulse status.
+ * Takes into account top tags from the week and the EMA delta.
+ */
+export function getStatusExplanation(
+  status: PulseStatus,
+  topTags: string[],
+  emaDelta: number
+): string {
+  const hasWaterTags = topTags.some((t) => t === 'salty food' || t === 'alcohol');
+  const hasWorkout   = topTags.includes('workout');
+  const hasStress    = topTags.includes('stress') || topTags.includes('poor sleep');
+
+  let main = '';
+  let detail = '';
+
+  switch (status) {
+    case 'GREEN':
+      main = 'Your trend is moving toward your goal.';
+      if (hasWorkout) {
+        detail = 'Consistent movement is paying off.';
+      } else {
+        detail = 'Keep your morning ritual consistent and the trend will hold.';
+      }
+      break;
+
+    case 'YELLOW':
+      main = "Your trend has drifted slightly away from your goal.";
+      if (hasWaterTags) {
+        detail =
+          'You tagged salty food or alcohol this week. This is most likely water retention — not fat. Sodium and alcohol cause your body to hold fluid temporarily. It usually passes in 24–48 hours.';
+      } else if (hasStress) {
+        detail =
+          'Stress and poor sleep raise cortisol, which can cause temporary water retention and slow your trend. Focus on recovery this week.';
+      } else {
+        detail =
+          'Small drifts are normal. One week does not define the trend. Stay consistent with your ritual and it will self-correct.';
+      }
+      break;
+
+    case 'BLUE':
+      main = "You're in a plateau — no significant movement yet.";
+      detail =
+        'Plateaus are a normal part of the process. Your body is adjusting. Keep weighing in every morning; the trend will resume. Consistency is the only lever you control.';
+      break;
+  }
+
+  // Override detail if a large spike correlates with water-weight tags
+  if (Math.abs(emaDelta) > 0.15 && hasWaterTags && status !== 'GREEN') {
+    detail =
+      'This looks like water retention, not fat. Salty food and alcohol can temporarily add 1–3 lbs of fluid. Give it 48 hours — the trend will correct itself.';
+  }
+
+  return detail ? `${main}\n\n${detail}` : main;
+}
+
 // ─── Record New Weight ───────────────────────────────────────────────────────
 
 /**

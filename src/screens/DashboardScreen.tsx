@@ -1,57 +1,98 @@
-import React, { useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { startOfWeek, format } from '../utils/dateUtils';
+import { startOfWeek, endOfWeek, format } from '../utils/dateUtils';
 import { useAppStore } from '../store/useAppStore';
 import { StatusPulse } from '../components/StatusPulse';
 import { ConsistencyRing } from '../components/ConsistencyRing';
-import { getCurrentStatus } from '../services/trendEngine';
-import { getCurrentStreak, getWeeklyWeighInCount } from '../db/db';
-
-// No weight values are imported or stored in this screen — Golden Rule enforced.
+import { TrendChart } from '../components/TrendChart';
+import { CoachingModal } from '../components/CoachingModal';
+import { getCurrentStatus, getStatusExplanation } from '../services/trendEngine';
+import {
+  getCurrentStreak,
+  getWeeklyWeighInCount,
+  getLastTwoEMASnapshots,
+  getLastNEMASnapshots,
+  getTopTagsForWeek,
+  EMASnapshot,
+} from '../db/db';
+import { colors, font } from '../theme';
 
 export function DashboardScreen() {
   const { profile, statusResult, setStatusResult } = useAppStore();
+  const [coachingVisible, setCoachingVisible] = useState(false);
+  const [coachingText, setCoachingText] = useState('');
+  const [chartWidth, setChartWidth] = useState(0);
+  const [trendSnapshots, setTrendSnapshots] = useState<EMASnapshot[]>([]);
 
   useFocusEffect(
     useCallback(() => {
-      // Recompute status every time tab is focused
       const now = new Date();
       const weekStart = format(startOfWeek(now), 'yyyy-MM-dd');
       const streak = getCurrentStreak();
       const weeklyCount = getWeeklyWeighInCount(weekStart, now.toISOString());
       const consistency = Math.round((weeklyCount / 7) * 100);
-
       const result = getCurrentStatus(streak, consistency);
       setStatusResult(result);
+
+      // Trend chart — last 14 snapshots in chronological order
+      const snaps = getLastNEMASnapshots(14).reverse();
+      setTrendSnapshots(snaps);
     }, [setStatusResult])
   );
 
-  const greeting = profile?.name ? `Good morning, ${profile.name}.` : 'Good morning.';
+  function handlePulseTap() {
+    const now = new Date();
+    const weekStart = startOfWeek(now).toISOString();
+    const weekEnd   = endOfWeek(now).toISOString();
+    const topTags   = getTopTagsForWeek(weekStart, weekEnd, 3);
+    const snaps     = getLastTwoEMASnapshots();
+    const emaDelta  = snaps.length >= 2 ? snaps[0].ema_value - snaps[1].ema_value : 0;
+    const text = getStatusExplanation(statusResult.status, topTags, emaDelta);
+    setCoachingText(text);
+    setCoachingVisible(true);
+  }
 
-  const weekLabel = format(
-    startOfWeek(new Date()),
-    "'Week of' MMM d"
-  );
+  // Split greeting: "Good morning, " + name in italic serif
+  const firstName = profile?.name?.split(' ')[0] ?? '';
+
+  const weekLabel = format(startOfWeek(new Date()), "'Week of' MMM d").toUpperCase();
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.greeting}>{greeting}</Text>
+      {/* Greeting */}
+      <View style={styles.greetingRow}>
+        <Text style={styles.greetingBase}>Good morning
+          {firstName ? <Text style={styles.greetingName}>, {firstName}.</Text> : '.'}
+        </Text>
+      </View>
       <Text style={styles.week}>{weekLabel}</Text>
 
-      <StatusPulse status={statusResult.status} />
+      {/* Tappable pulse */}
+      <TouchableOpacity onPress={handlePulseTap} activeOpacity={0.85}>
+        <StatusPulse status={statusResult.status} />
+        <Text style={styles.tapHint}>tap for insight</Text>
+      </TouchableOpacity>
+
+      {/* Trend chart */}
+      {trendSnapshots.length >= 2 && (
+        <View
+          style={styles.chartContainer}
+          onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}
+        >
+          {chartWidth > 0 && (
+            <TrendChart
+              snapshots={trendSnapshots}
+              status={statusResult.status}
+              width={chartWidth}
+              height={68}
+            />
+          )}
+        </View>
+      )}
 
       <View style={styles.ringRow}>
-        <ConsistencyRing
-          consistency={statusResult.consistency}
-          streak={statusResult.streak}
-        />
+        <ConsistencyRing consistency={statusResult.consistency} streak={statusResult.streak} />
       </View>
 
       <View style={styles.infoBox}>
@@ -69,6 +110,13 @@ export function DashboardScreen() {
           </Text>
         </View>
       )}
+
+      <CoachingModal
+        visible={coachingVisible}
+        onDismiss={() => setCoachingVisible(false)}
+        status={statusResult.status}
+        explanation={coachingText}
+      />
     </ScrollView>
   );
 }
@@ -76,65 +124,90 @@ export function DashboardScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#0A0A0F',
+    backgroundColor: colors.bg,
   },
   content: {
     padding: 24,
     paddingBottom: 48,
     alignItems: 'center',
   },
-  greeting: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '700',
+  greetingRow: {
     alignSelf: 'flex-start',
     marginBottom: 4,
   },
+  greetingBase: {
+    color: colors.textPrimary,
+    fontSize: 24,
+    fontFamily: font.body,
+  },
+  greetingName: {
+    color: colors.textPrimary,
+    fontSize: 26,
+    fontFamily: font.displayMedium,
+  },
   week: {
-    color: '#555',
-    fontSize: 13,
+    color: colors.textTertiary,
+    fontSize: 11,
+    fontFamily: font.bodySemiBold,
     alignSelf: 'flex-start',
     marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.4,
+  },
+  tapHint: {
+    color: colors.textHint,
+    fontSize: 11,
+    fontFamily: font.body,
+    textAlign: 'center',
+    marginTop: 4,
+    letterSpacing: 0.4,
+  },
+  chartContainer: {
+    width: '100%',
+    marginTop: 8,
+    marginBottom: 4,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
   },
   ringRow: {
-    marginTop: 8,
+    marginTop: 16,
     marginBottom: 32,
   },
   infoBox: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#2A2A3E',
+    borderColor: colors.border,
     width: '100%',
     marginBottom: 20,
   },
   infoTitle: {
-    color: '#9E9E9E',
+    color: colors.textTertiary,
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: font.bodySemiBold,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
     marginBottom: 8,
   },
   infoText: {
-    color: '#757575',
+    color: colors.textSecondary,
     fontSize: 14,
+    fontFamily: font.body,
     lineHeight: 21,
   },
   nudge: {
-    backgroundColor: '#1A2A1E',
+    backgroundColor: colors.greenDim,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#2A4A3E',
+    borderColor: colors.greenBorder,
     width: '100%',
   },
   nudgeText: {
-    color: '#9E9E9E',
+    color: colors.textSecondary,
     fontSize: 14,
+    fontFamily: font.body,
     textAlign: 'center',
     lineHeight: 20,
   },

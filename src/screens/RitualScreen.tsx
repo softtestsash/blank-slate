@@ -1,82 +1,65 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  Animated,
+  View, Text, ScrollView, TouchableOpacity,
+  StyleSheet, ActivityIndicator, Animated,
 } from 'react-native';
-import { useAppStore, RitualPhase } from '../store/useAppStore';
+import { useAppStore } from '../store/useAppStore';
 import { ChecklistItem } from '../components/ChecklistItem';
 import { TagChip } from '../components/TagChip';
+import { NoteInput } from '../components/NoteInput';
 import {
-  getChecklistItems,
-  insertMeasurement,
-  insertContextTags,
+  getChecklistItems, insertMeasurement, insertContextTags,
   ChecklistItem as ChecklistItemType,
 } from '../db/db';
-import { startScan, stopScan } from '../services/bleListener';
+import { startScan, stopScan, scanAllDevices } from '../services/bleListener';
 import { recordWeightAndUpdateEMA } from '../services/trendEngine';
+import { colors, font } from '../theme';
 
 const TAGS = [
-  { tag: 'salty food', emoji: '🧂' },
-  { tag: 'alcohol', emoji: '🍷' },
-  { tag: 'workout', emoji: '💪' },
-  { tag: 'period', emoji: '🌙' },
-  { tag: 'travel', emoji: '✈️' },
-  { tag: 'stress', emoji: '😤' },
-  { tag: 'illness', emoji: '🤒' },
-  { tag: 'poor sleep', emoji: '😴' },
+  { tag: 'salty food',   emoji: '🧂' },
+  { tag: 'alcohol',      emoji: '🍷' },
+  { tag: 'workout',      emoji: '💪' },
+  { tag: 'period',       emoji: '🌙' },
+  { tag: 'travel',       emoji: '✈️' },
+  { tag: 'stress',       emoji: '😤' },
+  { tag: 'illness',      emoji: '🤒' },
+  { tag: 'poor sleep',   emoji: '😴' },
+  { tag: 'big meal',     emoji: '🍽️' },
+  { tag: 'dehydrated',   emoji: '💧' },
+  { tag: 'great sleep',  emoji: '⭐' },
+  { tag: 'social event', emoji: '🎉' },
+  { tag: 'hormones',     emoji: '🔄' },
+  { tag: 'medications',  emoji: '💊' },
 ];
 
 export function RitualScreen() {
   const {
-    ritualPhase,
-    checkedItems,
-    selectedTags,
-    pendingMeasurementId,
-    setRitualPhase,
-    toggleChecklistItem,
-    toggleTag,
-    setPendingMeasurementId,
-    resetRitual,
+    ritualPhase, checkedItems, selectedTags, ritualNotes,
+    setRitualPhase, toggleChecklistItem, toggleTag, resetRitual, setRitualNotes,
   } = useAppStore();
 
   const [checklistItems, setChecklistItems] = React.useState<ChecklistItemType[]>([]);
   const [bleStatusText, setBleStatusText] = React.useState('Searching for your scale…');
   const successScale = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    setChecklistItems(getChecklistItems());
-  }, []);
+  const pendingWeight    = useRef<number | null>(null);
+  const pendingTimestamp = useRef<string | null>(null);
 
-  // Animate success circle when COMPLETE
+  useEffect(() => { setChecklistItems(getChecklistItems()); }, []);
+
   useEffect(() => {
     if (ritualPhase === 'COMPLETE') {
-      Animated.spring(successScale, {
-        toValue: 1,
-        friction: 5,
-        useNativeDriver: true,
-      }).start();
-      const timer = setTimeout(() => {
-        resetRitual();
-      }, 2200);
+      Animated.spring(successScale, { toValue: 1, friction: 5, useNativeDriver: true }).start();
+      const timer = setTimeout(() => resetRitual(), 2200);
       return () => clearTimeout(timer);
     }
   }, [ritualPhase]);
 
-  // Clean up BLE if user navigates away mid-scan
   useEffect(() => {
-    return () => {
-      if (ritualPhase === 'AWAITING_SCALE') stopScan();
-    };
+    return () => { if (ritualPhase === 'AWAITING_SCALE') stopScan(); };
   }, [ritualPhase]);
 
-  const allChecked =
-    checklistItems.length > 0 &&
-    checklistItems.every((item) => checkedItems.has(item.id));
+  const allChecked = checklistItems.length > 0 && checklistItems.every((item) => checkedItems.has(item.id));
 
   function handleStartScale() {
     setRitualPhase('AWAITING_SCALE');
@@ -92,26 +75,33 @@ export function RitualScreen() {
         setBleStatusText(labels[status] ?? status);
       },
       onWeightStable: (weightKg) => {
-        // Golden Rule: raw weight never stored in state — goes straight to DB.
-        const id = insertMeasurement(weightKg, new Date().toISOString(), true);
+        pendingWeight.current    = weightKg;
+        pendingTimestamp.current = new Date().toISOString();
         recordWeightAndUpdateEMA(weightKg);
-        setPendingMeasurementId(id);
         setRitualPhase('TAGGING');
       },
-      onError: (err) => {
-        setBleStatusText(`Error: ${err}`);
-      },
+      onError: (err) => { setBleStatusText(`Error: ${err}`); },
     });
   }
 
-  function handleFinishTagging() {
-    if (pendingMeasurementId !== null && selectedTags.length > 0) {
-      insertContextTags(pendingMeasurementId, selectedTags);
+  function handleDebugScan() {
+    scanAllDevices().catch((e) => console.error('[BLE Debug]', e));
+  }
+
+  function handleFinishTagging() { setRitualPhase('NOTES'); }
+
+  function handleFinishNotes() {
+    if (pendingWeight.current !== null && pendingTimestamp.current !== null) {
+      const notes = ritualNotes.trim() || undefined;
+      const id = insertMeasurement(pendingWeight.current, pendingTimestamp.current, true, notes);
+      if (id !== -1 && selectedTags.length > 0) insertContextTags(id, selectedTags);
+      pendingWeight.current = null;
+      pendingTimestamp.current = null;
     }
     setRitualPhase('COMPLETE');
   }
 
-  // ─── Phase: IDLE ──────────────────────────────────────────────────────────
+  // ─── IDLE ────────────────────────────────────────────────────────────────────
   if (ritualPhase === 'IDLE') {
     return (
       <View style={[styles.screen, styles.centered]}>
@@ -120,17 +110,14 @@ export function RitualScreen() {
         <Text style={styles.idleSub}>
           A consistent weigh-in routine is what makes the trend trustworthy.
         </Text>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => setRitualPhase('CHECKLIST')}
-        >
+        <TouchableOpacity style={styles.button} onPress={() => setRitualPhase('CHECKLIST')}>
           <Text style={styles.buttonText}>Begin</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  // ─── Phase: CHECKLIST ─────────────────────────────────────────────────────
+  // ─── CHECKLIST ───────────────────────────────────────────────────────────────
   if (ritualPhase === 'CHECKLIST') {
     return (
       <View style={styles.screen}>
@@ -140,11 +127,8 @@ export function RitualScreen() {
           <Text style={styles.phaseSub}>Tick each box before stepping on the scale.</Text>
           {checklistItems.map((item) => (
             <ChecklistItem
-              key={item.id}
-              id={item.id}
-              label={item.label}
-              description={item.description}
-              checked={checkedItems.has(item.id)}
+              key={item.id} id={item.id} label={item.label}
+              description={item.description} checked={checkedItems.has(item.id)}
               onToggle={toggleChecklistItem}
             />
           ))}
@@ -152,8 +136,7 @@ export function RitualScreen() {
         <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.button, !allChecked && styles.buttonDisabled]}
-            onPress={handleStartScale}
-            disabled={!allChecked}
+            onPress={handleStartScale} disabled={!allChecked}
           >
             <Text style={styles.buttonText}>Step on Scale →</Text>
           </TouchableOpacity>
@@ -162,46 +145,68 @@ export function RitualScreen() {
     );
   }
 
-  // ─── Phase: AWAITING_SCALE ────────────────────────────────────────────────
+  // ─── AWAITING_SCALE ──────────────────────────────────────────────────────────
   if (ritualPhase === 'AWAITING_SCALE') {
     return (
       <View style={[styles.screen, styles.centered]}>
-        <ActivityIndicator size="large" color="#42A5F5" style={styles.spinner} />
+        <ActivityIndicator size="large" color={colors.accent} style={styles.spinner} />
         <Text style={styles.scanText}>{bleStatusText}</Text>
-        <TouchableOpacity style={styles.cancelLink} onPress={() => {
-          stopScan();
-          setRitualPhase('CHECKLIST');
-        }}>
+        <TouchableOpacity style={styles.cancelLink} onPress={() => { stopScan(); setRitualPhase('CHECKLIST'); }}>
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
+        {__DEV__ && (
+          <TouchableOpacity style={styles.debugBtn} onPress={handleDebugScan}>
+            <Text style={styles.debugText}>Debug: Scan All Devices</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
 
-  // ─── Phase: TAGGING ───────────────────────────────────────────────────────
+  // ─── TAGGING ─────────────────────────────────────────────────────────────────
   if (ritualPhase === 'TAGGING') {
     return (
       <View style={styles.screen}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.phaseLabel}>Context</Text>
           <Text style={styles.phaseTitle}>Anything relevant{'\n'}today?</Text>
-          <Text style={styles.phaseSub}>
-            Tags help explain any unusual swings. Skip if nothing applies.
-          </Text>
+          <Text style={styles.phaseSub}>Tags help explain any unusual swings. Skip if nothing applies.</Text>
           <View style={styles.tagGrid}>
             {TAGS.map((t) => (
               <TagChip
-                key={t.tag}
-                tag={t.tag}
-                emoji={t.emoji}
-                selected={selectedTags.includes(t.tag)}
-                onToggle={toggleTag}
+                key={t.tag} tag={t.tag} emoji={t.emoji}
+                selected={selectedTags.includes(t.tag)} onToggle={toggleTag}
               />
             ))}
           </View>
         </ScrollView>
         <View style={styles.footer}>
           <TouchableOpacity style={styles.button} onPress={handleFinishTagging}>
+            <Text style={styles.buttonText}>Next →</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ─── NOTES ───────────────────────────────────────────────────────────────────
+  if (ritualPhase === 'NOTES') {
+    return (
+      <View style={styles.screen}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.phaseLabel}>Note</Text>
+          <Text style={styles.phaseTitle}>Anything to log?</Text>
+          <Text style={styles.phaseSub}>
+            Capture what you ate or how you feel. Helps you spot patterns over time.
+          </Text>
+          <NoteInput
+            value={ritualNotes}
+            onChangeText={setRitualNotes}
+            placeholder="e.g. big pasta dinner last night, birthday cake, felt dehydrated…"
+          />
+        </ScrollView>
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.button} onPress={handleFinishNotes}>
             <Text style={styles.buttonText}>Done ✓</Text>
           </TouchableOpacity>
         </View>
@@ -209,12 +214,10 @@ export function RitualScreen() {
     );
   }
 
-  // ─── Phase: COMPLETE ──────────────────────────────────────────────────────
+  // ─── COMPLETE ────────────────────────────────────────────────────────────────
   return (
     <View style={[styles.screen, styles.centered]}>
-      <Animated.View
-        style={[styles.successCircle, { transform: [{ scale: successScale }] }]}
-      >
+      <Animated.View style={[styles.successCircle, { transform: [{ scale: successScale }] }]}>
         <Text style={styles.successCheck}>✓</Text>
       </Animated.View>
       <Text style={styles.successTitle}>Logged.</Text>
@@ -224,65 +227,46 @@ export function RitualScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0A0F' },
+  screen: { flex: 1, backgroundColor: colors.bg },
   centered: { alignItems: 'center', justifyContent: 'center', padding: 32 },
   scrollContent: { padding: 24, paddingBottom: 120 },
 
-  // IDLE
   idleEmoji: { fontSize: 48, marginBottom: 20 },
-  idleTitle: { color: '#FFFFFF', fontSize: 26, fontWeight: '700', marginBottom: 12 },
-  idleSub: { color: '#9E9E9E', fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 40 },
+  idleTitle: { color: colors.textPrimary, fontSize: 30, fontFamily: font.display, marginBottom: 12 },
+  idleSub: { color: colors.textSecondary, fontSize: 15, fontFamily: font.body, lineHeight: 22, textAlign: 'center', marginBottom: 40 },
 
-  // Phase headers
-  phaseLabel: { color: '#555', fontSize: 11, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 },
-  phaseTitle: { color: '#FFFFFF', fontSize: 26, fontWeight: '700', marginBottom: 8, lineHeight: 34 },
-  phaseSub: { color: '#9E9E9E', fontSize: 14, lineHeight: 20, marginBottom: 24 },
+  phaseLabel: { color: colors.textTertiary, fontSize: 11, fontFamily: font.bodySemiBold, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 },
+  phaseTitle: { color: colors.textPrimary, fontSize: 30, fontFamily: font.display, marginBottom: 8, lineHeight: 36 },
+  phaseSub: { color: colors.textSecondary, fontSize: 14, fontFamily: font.body, lineHeight: 20, marginBottom: 24 },
 
-  // Awaiting scale
   spinner: { marginBottom: 24 },
-  scanText: { color: '#9E9E9E', fontSize: 16, textAlign: 'center', marginBottom: 20 },
+  scanText: { color: colors.textSecondary, fontSize: 16, fontFamily: font.body, textAlign: 'center', marginBottom: 20 },
   cancelLink: { marginTop: 8 },
-  cancelText: { color: '#555', fontSize: 14 },
+  cancelText: { color: colors.textTertiary, fontSize: 14, fontFamily: font.body },
+  debugBtn: { marginTop: 28, padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 8 },
+  debugText: { color: colors.textHint, fontSize: 12 },
 
-  // Tags
   tagGrid: { flexDirection: 'row', flexWrap: 'wrap' },
 
-  // Footer button
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    backgroundColor: '#0A0A0F',
-    borderTopWidth: 1,
-    borderTopColor: '#1A1A2E',
+    position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20,
+    backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.borderSubtle,
   },
   button: {
-    backgroundColor: '#42A5F5',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: 14, paddingVertical: 16, alignItems: 'center',
   },
-  buttonDisabled: { backgroundColor: '#1A2A3E', opacity: 0.6 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  buttonDisabled: { backgroundColor: colors.card, opacity: 0.5 },
+  buttonText: { color: colors.white, fontSize: 16, fontFamily: font.bodySemiBold },
 
-  // Complete
   successCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#4CAF50',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
-    elevation: 12,
+    width: 96, height: 96, borderRadius: 48,
+    backgroundColor: colors.success,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 28,
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 28, elevation: 10,
   },
-  successCheck: { color: '#fff', fontSize: 40, fontWeight: '700' },
-  successTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 10 },
-  successSub: { color: '#9E9E9E', fontSize: 15 },
+  successCheck: { color: colors.white, fontSize: 38, fontFamily: font.bodySemiBold },
+  successTitle: { color: colors.textPrimary, fontSize: 28, fontFamily: font.display, marginBottom: 10 },
+  successSub: { color: colors.textSecondary, fontSize: 15, fontFamily: font.body },
 });

@@ -16,6 +16,7 @@ export type RitualPhase =
   | 'CHECKLIST'
   | 'AWAITING_SCALE'
   | 'TAGGING'
+  | 'NOTES'
   | 'COMPLETE';
 
 export interface StatusResult {
@@ -31,6 +32,7 @@ interface AppState {
   checkedItems: Set<number>;
   selectedTags: string[];
   pendingMeasurementId: number | null;
+  ritualNotes: string;
 
   setProfile: (p: UserProfile) => void;
   setStatusResult: (r: StatusResult) => void;
@@ -39,6 +41,7 @@ interface AppState {
   toggleTag: (tag: string) => void;
   resetRitual: () => void;
   setPendingMeasurementId: (id: number | null) => void;
+  setRitualNotes: (notes: string) => void;
 }
 
 // ─── Module-level singleton ───────────────────────────────────────────────────
@@ -50,6 +53,7 @@ let _data = {
   checkedItems: new Set<number>(),
   selectedTags: [] as string[],
   pendingMeasurementId: null as number | null,
+  ritualNotes: '',
 };
 
 const _listeners = new Set<() => void>();
@@ -83,8 +87,10 @@ const _actions = {
       checkedItems: new Set<number>(),
       selectedTags: [],
       pendingMeasurementId: null,
+      ritualNotes: '',
     }),
   setPendingMeasurementId: (id: number | null) => _set({ pendingMeasurementId: id }),
+  setRitualNotes: (notes: string) => _set({ ritualNotes: notes }),
 };
 
 function _snapshot(): AppState {

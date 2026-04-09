@@ -1,7 +1,14 @@
-// ─── Renpho / QN-Scale BLE UUIDs ─────────────────────────────────────────────
+// ─── Known Scale BLE UUIDs ────────────────────────────────────────────────────
+// QN-Scale / Renpho older models (ES-CS20M etc.)
+const QN_SERVICE_UUID = '0000ffb0-0000-1000-8000-00805f9b34fb';
+const QN_CHAR_UUID    = '0000ffb2-0000-1000-8000-00805f9b34fb';
 
-const SERVICE_UUID = '0000ffb0-0000-1000-8000-00805f9b34fb';
-const CHAR_UUID    = '0000ffb2-0000-1000-8000-00805f9b34fb';
+// BT SIG Weight Scale Service (Renpho ES-RLS81 / Elis 1 and newer models)
+const BTSIG_SERVICE_UUID = '0000181d-0000-1000-8000-00805f9b34fb';
+const BTSIG_CHAR_UUID    = '00002a9d-0000-1000-8000-00805f9b34fb';
+
+// Scan for both simultaneously
+const ALL_SERVICE_UUIDS = [QN_SERVICE_UUID, BTSIG_SERVICE_UUID];
 
 // ─── Lazy BLE load ────────────────────────────────────────────────────────────
 // react-native-ble-plx is a native module — not available in Expo Go or on web.
@@ -32,14 +39,24 @@ export function setMockMode(enabled: boolean): void {
   MOCK_MODE = enabled;
 }
 
-// ─── Weight Parser ────────────────────────────────────────────────────────────
+// ─── Weight Parsers ───────────────────────────────────────────────────────────
 
-/**
- * Parse Renpho/QN-Scale BLE notification bytes into weight (kg).
- * Formula: (Byte3 * 256 + Byte4) / 100
- */
+/** QN-Scale / Renpho older protocol: (Byte3 * 256 + Byte4) / 100 → kg */
 export function parseWeightKg(bytes: number[]): number {
   return (bytes[3] * 256 + bytes[4]) / 100;
+}
+
+/**
+ * BT SIG Weight Measurement (0x2A9D) parser.
+ * Byte 0: flags (bit 0 = 0 → SI/kg, 1 → Imperial/lbs)
+ * Bytes 1-2: uint16 LE weight value
+ * SI: value * 0.005 = kg; Imperial: value * 0.01 lbs → kg
+ */
+function parseWeightKgBTSIG(bytes: number[]): number {
+  const flags = bytes[0];
+  const isSI = (flags & 0x01) === 0;
+  const rawValue = bytes[1] | (bytes[2] << 8);
+  return isSI ? rawValue * 0.005 : (rawValue * 0.01) / 2.20462;
 }
 
 function base64ToBytes(b64: string): number[] {
@@ -129,7 +146,7 @@ export async function startScan(callbacks: BLECallbacks): Promise<void> {
   const ble = getManager();
   callbacks.onStatus('scanning');
 
-  ble.startDeviceScan([SERVICE_UUID], null, async (error: any, device: any) => {
+  ble.startDeviceScan(ALL_SERVICE_UUIDS, null, async (error: any, device: any) => {
     if (error) {
       callbacks.onError(error.message);
       callbacks.onStatus('error');
@@ -140,6 +157,15 @@ export async function startScan(callbacks: BLECallbacks): Promise<void> {
     ble.stopDeviceScan();
     callbacks.onStatus('connecting');
 
+    // Determine which protocol to use based on advertised services
+    const services: string[] = device.serviceUUIDs ?? [];
+    const isBTSIG = services.some((s: string) => s.toLowerCase().includes('181d'));
+    const serviceUUID = isBTSIG ? BTSIG_SERVICE_UUID : QN_SERVICE_UUID;
+    const charUUID    = isBTSIG ? BTSIG_CHAR_UUID    : QN_CHAR_UUID;
+    const parser      = isBTSIG ? parseWeightKgBTSIG : parseWeightKg;
+
+    console.log(`[BLE] Device: ${device.name ?? 'unnamed'} | Protocol: ${isBTSIG ? 'BT-SIG' : 'QN-Scale'}`);
+
     try {
       activeDevice = await device.connect();
       await activeDevice.discoverAllServicesAndCharacteristics();
@@ -147,16 +173,16 @@ export async function startScan(callbacks: BLECallbacks): Promise<void> {
       callbacks.onStatus('receiving');
 
       subscription = activeDevice.monitorCharacteristicForService(
-        SERVICE_UUID,
-        CHAR_UUID,
+        serviceUUID,
+        charUUID,
         (err: any, char: any) => {
           if (err || !char?.value) return;
 
           const bytes = base64ToBytes(char.value);
-          if (bytes.length < 5) return;
+          if (bytes.length < 3) return;
 
-          const weightKg = parseWeightKg(bytes);
-          if (weightKg <= 0) return;
+          const weightKg = parser(bytes);
+          if (weightKg <= 0 || weightKg > 300) return;
 
           if (checkStable(weightKg)) {
             callbacks.onStatus('stable');
@@ -171,6 +197,41 @@ export async function startScan(callbacks: BLECallbacks): Promise<void> {
       callbacks.onStatus('error');
     }
   });
+}
+
+/**
+ * Debug scan — logs ALL nearby BLE devices and their service UUIDs.
+ * Useful for discovering the correct UUIDs for an unrecognised scale.
+ * Dev-only: call from a debug button in the UI.
+ */
+export async function scanAllDevices(): Promise<void> {
+  loadBLE();
+  if (!BleManagerClass) {
+    console.log('[BLE Debug] BLE not available on this platform');
+    return;
+  }
+  const ble = getManager();
+  console.log('[BLE Debug] Starting promiscuous scan for 10 seconds…');
+
+  ble.startDeviceScan(null, null, (error: any, device: any) => {
+    if (error) {
+      console.error('[BLE Debug] Scan error:', error.message);
+      return;
+    }
+    if (device) {
+      console.log(
+        `[BLE Debug] ${device.name ?? '(unnamed)'} | id: ${device.id} | rssi: ${device.rssi}`
+      );
+      if (device.serviceUUIDs?.length) {
+        console.log(`  Services: ${device.serviceUUIDs.join(', ')}`);
+      }
+    }
+  });
+
+  setTimeout(() => {
+    ble.stopDeviceScan();
+    console.log('[BLE Debug] Scan complete — check Expo logs for device UUIDs.');
+  }, 10000);
 }
 
 export function stopScan(): void {

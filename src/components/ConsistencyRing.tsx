@@ -1,8 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-
-// ─── Component ────────────────────────────────────────────────────────────────
+import { colors, font } from '../theme';
 
 interface ConsistencyRingProps {
   consistency: number; // 0–100
@@ -10,7 +9,7 @@ interface ConsistencyRingProps {
 }
 
 const SIZE = 120;
-const STROKE_WIDTH = 10;
+const STROKE_WIDTH = 8;
 const RADIUS = (SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
@@ -35,7 +34,7 @@ export function ConsistencyRing({ consistency, streak }: ConsistencyRingProps) {
             cx={SIZE / 2}
             cy={SIZE / 2}
             r={RADIUS}
-            stroke="#2A2A3E"
+            stroke={colors.borderSubtle}
             strokeWidth={STROKE_WIDTH}
             fill="none"
           />
@@ -44,7 +43,7 @@ export function ConsistencyRing({ consistency, streak }: ConsistencyRingProps) {
             cx={SIZE / 2}
             cy={SIZE / 2}
             r={RADIUS}
-            stroke="#42A5F5"
+            stroke={colors.accent}
             strokeWidth={STROKE_WIDTH}
             fill="none"
             strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
@@ -61,17 +60,15 @@ export function ConsistencyRing({ consistency, streak }: ConsistencyRingProps) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
   },
   title: {
-    color: '#9E9E9E',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 1.2,
+    color: colors.textTertiary,
+    fontSize: 11,
+    fontFamily: font.bodySemiBold,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
     marginBottom: 12,
   },
@@ -83,13 +80,14 @@ const styles = StyleSheet.create({
   },
   pct: {
     position: 'absolute',
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: font.bodySemiBold,
   },
   label: {
-    color: '#9E9E9E',
+    color: colors.textSecondary,
     fontSize: 13,
+    fontFamily: font.body,
     marginTop: 8,
   },
 });

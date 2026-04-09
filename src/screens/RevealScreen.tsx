@@ -7,6 +7,7 @@ import {
   Animated,
   TouchableOpacity,
 } from 'react-native';
+import { colors, font } from '../theme';
 import {
   startOfWeek,
   endOfWeek,
@@ -21,7 +22,9 @@ import {
   upsertWeeklySummary,
   getTopTagsForWeek,
   getProfile,
+  getLast28DayPresence,
 } from '../db/db';
+import { HabitHeatmap } from '../components/HabitHeatmap';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,6 +67,7 @@ interface RevealData {
   weekLabel: string;
   unit: 'lbs' | 'kg';
   targetWeight: number;
+  heatmapDays: string[];
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -120,6 +124,7 @@ export function RevealScreen() {
     upsertWeeklySummary(weekStart, avg, prior ? avg - prior.average_weight : null, count);
 
     const topTags = getTopTagsForWeek(weekStart, weekEnd, 3);
+    const heatmapDays = getLast28DayPresence();
 
     return {
       averageWeight: Math.round(displayWeight * 10) / 10,
@@ -129,6 +134,7 @@ export function RevealScreen() {
       weekLabel: `${weekStartLabel} – ${weekEndLabel}`,
       unit: profile?.unit ?? 'lbs',
       targetWeight: displayTarget,
+      heatmapDays,
     };
   }
 
@@ -220,6 +226,12 @@ export function RevealScreen() {
       <Text style={styles.revealTitle}>This Week</Text>
       <Text style={styles.revealWeek}>{revealData.weekLabel}</Text>
 
+      {/* Habit heatmap — 4-week weigh-in presence grid */}
+      <View style={styles.heatmapCard}>
+        <Text style={styles.infoCardTitle}>Your Last 28 Days</Text>
+        <HabitHeatmap presentDays={revealData.heatmapDays} />
+      </View>
+
       {/* THE ONE PLACE A NUMBER IS SHOWN */}
       <View style={styles.weightBox}>
         <Text style={styles.weightLabel}>Weekly Average</Text>
@@ -273,75 +285,85 @@ export function RevealScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0A0F' },
+  screen: { flex: 1, backgroundColor: colors.bg },
   centered: { alignItems: 'center', justifyContent: 'center', padding: 32 },
 
   // Locked
-  lockEmoji: { fontSize: 52, marginBottom: 20 },
-  lockTitle: { color: '#FFFFFF', fontSize: 26, fontWeight: '700', marginBottom: 10 },
-  lockSub: { color: '#9E9E9E', fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+  lockEmoji: { fontSize: 48, marginBottom: 20 },
+  lockTitle: { color: colors.textPrimary, fontSize: 28, fontFamily: font.display, marginBottom: 10 },
+  lockSub: { color: colors.textSecondary, fontSize: 15, fontFamily: font.body, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   countdownBox: {
-    backgroundColor: '#1A1A2E',
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    padding: 28,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2A2A3E',
+    borderColor: colors.border,
     marginBottom: 24,
     width: '100%',
   },
-  countdownLabel: { color: '#555', fontSize: 12, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 },
-  countdown: { color: '#FFFFFF', fontSize: 36, fontWeight: '700' },
-  lockNote: { color: '#555', fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  countdownLabel: { color: colors.textTertiary, fontSize: 11, fontFamily: font.bodySemiBold, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 10 },
+  countdown: { color: colors.textPrimary, fontSize: 42, fontFamily: font.display },
+  lockNote: { color: colors.textTertiary, fontSize: 13, fontFamily: font.body, textAlign: 'center', lineHeight: 18 },
 
   // Envelope
-  unlockLabel: { color: '#555', fontSize: 12, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 },
-  unlockSub: { color: '#9E9E9E', fontSize: 16, marginBottom: 40 },
+  unlockLabel: { color: colors.textTertiary, fontSize: 11, fontFamily: font.bodySemiBold, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 },
+  unlockSub: { color: colors.textSecondary, fontSize: 16, fontFamily: font.displayItalic, marginBottom: 40 },
   envelope: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: colors.card,
     borderRadius: 24,
     width: 180,
     height: 180,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#2A2A3E',
-    shadowColor: '#42A5F5',
+    borderColor: colors.border,
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
     elevation: 8,
   },
   envelopeEmoji: { fontSize: 60, marginBottom: 10 },
-  envelopeHint: { color: '#9E9E9E', fontSize: 13 },
+  envelopeHint: { color: colors.textTertiary, fontSize: 13, fontFamily: font.body },
 
   // Reveal
   revealContent: { padding: 24, paddingBottom: 60 },
-  revealTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 4 },
-  revealWeek: { color: '#555', fontSize: 13, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 28 },
+  revealTitle: { color: colors.textPrimary, fontSize: 30, fontFamily: font.display, marginBottom: 4 },
+  revealWeek: { color: colors.textSecondary, fontSize: 16, fontFamily: font.displayItalic, marginBottom: 28 },
   weightBox: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: colors.card,
     borderRadius: 20,
-    padding: 28,
+    padding: 32,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2A2A3E',
+    borderColor: colors.border,
     marginBottom: 16,
   },
-  weightLabel: { color: '#9E9E9E', fontSize: 12, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12 },
-  weightValue: { color: '#FFFFFF', fontSize: 52, fontWeight: '700' },
-  weightUnit: { fontSize: 24, fontWeight: '400', color: '#9E9E9E' },
-  delta: { fontSize: 16, fontWeight: '600', marginTop: 10 },
+  weightLabel: { color: colors.textTertiary, fontSize: 11, fontFamily: font.bodySemiBold, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 14 },
+  weightValue: { color: colors.textPrimary, fontSize: 68, fontFamily: font.display, lineHeight: 76 },
+  weightUnit: { fontSize: 26, fontFamily: font.displayItalic, color: colors.textSecondary },
+  delta: { fontSize: 16, fontFamily: font.bodyMedium, marginTop: 12 },
   infoCard: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#2A2A3E',
+    borderColor: colors.border,
   },
-  infoCardGreen: { borderColor: '#4CAF5066', backgroundColor: '#4CAF5011' },
-  infoCardTitle: { color: '#555', fontSize: 11, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 },
-  infoCardText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
-  footnote: { color: '#333', fontSize: 12, textAlign: 'center', marginTop: 20, fontStyle: 'italic' },
+  infoCardGreen: { borderColor: colors.greenBorder, backgroundColor: colors.greenDim },
+  infoCardTitle: { color: colors.textTertiary, fontSize: 11, fontFamily: font.bodySemiBold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 },
+  infoCardText: { color: colors.textPrimary, fontSize: 17, fontFamily: font.bodyMedium },
+  footnote: { color: colors.textHint, fontSize: 12, fontFamily: font.displayItalic, textAlign: 'center', marginTop: 24 },
+  heatmapCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    width: '100%',
+    alignItems: 'center',
+  },
 });

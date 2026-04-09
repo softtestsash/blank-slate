@@ -89,13 +89,14 @@ export function insertProfile(
 export function insertMeasurement(
   rawWeight: number,
   timestamp: string,
-  ritualComplete: boolean
+  ritualComplete: boolean,
+  notes?: string
 ): number {
   const db = getDB();
   if (!db) return -1;
   const result = db.runSync(
-    'INSERT INTO measurements (raw_weight, timestamp, ritual_complete) VALUES (?, ?, ?)',
-    [rawWeight, timestamp, ritualComplete ? 1 : 0]
+    'INSERT INTO measurements (raw_weight, timestamp, ritual_complete, notes) VALUES (?, ?, ?, ?)',
+    [rawWeight, timestamp, ritualComplete ? 1 : 0, notes ?? null]
   );
   return result.lastInsertRowId;
 }
@@ -154,6 +155,13 @@ export function insertEMASnapshot(emaValue: number): void {
 export function getLastTwoEMASnapshots(): EMASnapshot[] {
   return getDB()?.getAllSync<EMASnapshot>(
     'SELECT * FROM ema_snapshots ORDER BY recorded_at DESC LIMIT 2'
+  ) ?? [];
+}
+
+export function getLastNEMASnapshots(n: number): EMASnapshot[] {
+  return getDB()?.getAllSync<EMASnapshot>(
+    'SELECT * FROM ema_snapshots ORDER BY recorded_at DESC LIMIT ?',
+    [n]
   ) ?? [];
 }
 
@@ -249,6 +257,20 @@ export function getCurrentStreak(): number {
     }
   }
   return streak;
+}
+
+// Returns set of distinct days (YYYY-MM-DD) in the last 28 days that had a weigh-in.
+export function getLast28DayPresence(): string[] {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 27);
+  const rows: { day: string }[] = getDB()?.getAllSync<{ day: string }>(
+    `SELECT DISTINCT date(timestamp) as day
+     FROM measurements
+     WHERE timestamp >= ?
+     ORDER BY day ASC`,
+    [cutoff.toISOString().slice(0, 10)]
+  ) ?? [];
+  return rows.map((r) => r.day);
 }
 
 // Returns top N most-used tags this week.

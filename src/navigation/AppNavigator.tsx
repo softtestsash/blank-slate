@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
+import { colors, font } from '../theme';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -58,19 +59,19 @@ function MainTabs() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0D0D1A',
-          borderTopColor: '#1A1A2E',
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
           paddingBottom: 6,
-          height: 64,
+          height: 68,
         },
-        tabBarActiveTintColor: '#42A5F5',
-        tabBarInactiveTintColor: '#555',
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textTertiary,
         tabBarIcon: ({ focused }) => (
-          <Text style={{ fontSize: 18, color: focused ? '#42A5F5' : '#555' }}>
+          <Text style={{ fontSize: 18, color: focused ? colors.accent : colors.textTertiary }}>
             {tabIcon(route.name, focused)}
           </Text>
         ),
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 11, fontFamily: font.bodyMedium },
       })}
     >
       <MainTab.Screen name="Dashboard" component={DashboardScreen} />
@@ -91,7 +92,7 @@ function OnboardingFlow() {
     <OnboardingStack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#0A0A0F' },
+        contentStyle: { backgroundColor: colors.bg },
         animation: 'slide_from_right',
       }}
     >
@@ -153,8 +154,8 @@ export function AppNavigator() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0A0A0F', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator color="#42A5F5" />
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
