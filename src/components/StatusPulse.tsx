@@ -38,6 +38,8 @@ const STATUS_CONFIG: Record<
 };
 
 const CIRCLE_SIZE = 200;
+const GLOW_SIZE   = CIRCLE_SIZE + 80; // 280
+const MID_SIZE    = CIRCLE_SIZE + 36; // 236
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,12 @@ export function StatusPulse({ status }: StatusPulseProps) {
     cancelAnimation(outerOpacity);
     cancelAnimation(midScale);
     cancelAnimation(innerOpacity);
+
+    // Reset to base values so each status always breathes the full range
+    outerScale.value   = 1;
+    outerOpacity.value = 0.3;
+    midScale.value     = 1;
+    innerOpacity.value = 1;
 
     outerScale.value = withRepeat(
       withTiming(1.18, { duration: cfg.duration, easing: Easing.inOut(Easing.sin) }),
@@ -93,17 +101,14 @@ export function StatusPulse({ status }: StatusPulseProps) {
 
   return (
     <View style={styles.container}>
-      {/* Outer glow */}
-      <Animated.View style={[styles.outerGlow, { backgroundColor: cfg.glow }, outerStyle]} />
-      {/* Middle ring */}
-      <Animated.View style={[styles.midRing, { backgroundColor: cfg.glow }, midStyle]} />
-
-      {/* Core circle */}
-      <View style={[styles.circle, { borderColor: cfg.color + '60', backgroundColor: cfg.color + '14' }]}>
-        {/* Bright center highlight */}
-        <Animated.View style={[styles.innerHighlight, { backgroundColor: cfg.color }, innerDotStyle]} />
-        {/* Solid core dot */}
-        <View style={[styles.coreDot, { backgroundColor: cfg.color }]} />
+      {/* Fixed-size wrapper so absolute rings always center on the circle */}
+      <View style={styles.pulseWrapper}>
+        <Animated.View style={[styles.outerGlow, { backgroundColor: cfg.glow }, outerStyle]} />
+        <Animated.View style={[styles.midRing,  { backgroundColor: cfg.glow }, midStyle]} />
+        <View style={[styles.circle, { borderColor: cfg.color + '60', backgroundColor: cfg.color + '14' }]}>
+          <Animated.View style={[styles.innerHighlight, { backgroundColor: cfg.color }, innerDotStyle]} />
+          <View style={[styles.coreDot, { backgroundColor: cfg.color }]} />
+        </View>
       </View>
 
       <Text style={[styles.label, { color: cfg.color }]}>{cfg.label}</Text>
@@ -116,21 +121,30 @@ export function StatusPulse({ status }: StatusPulseProps) {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    justifyContent: 'center',
     marginVertical: 28,
+  },
+  pulseWrapper: {
+    width:  GLOW_SIZE,
+    height: GLOW_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   outerGlow: {
     position: 'absolute',
-    width:  CIRCLE_SIZE + 80,
-    height: CIRCLE_SIZE + 80,
-    borderRadius: (CIRCLE_SIZE + 80) / 2,
+    width:  GLOW_SIZE,
+    height: GLOW_SIZE,
+    borderRadius: GLOW_SIZE / 2,
+    top:  0,
+    left: 0,
   },
   midRing: {
     position: 'absolute',
-    width:  CIRCLE_SIZE + 36,
-    height: CIRCLE_SIZE + 36,
-    borderRadius: (CIRCLE_SIZE + 36) / 2,
+    width:  MID_SIZE,
+    height: MID_SIZE,
+    borderRadius: MID_SIZE / 2,
     opacity: 0.6,
+    top:  (GLOW_SIZE - MID_SIZE) / 2,
+    left: (GLOW_SIZE - MID_SIZE) / 2,
   },
   circle: {
     width:  CIRCLE_SIZE,

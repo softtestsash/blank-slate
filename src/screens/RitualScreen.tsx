@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Animated,
+  StyleSheet, ActivityIndicator, Animated, Easing,
 } from 'react-native';
 import { useAppStore } from '../store/useAppStore';
 import { ChecklistItem } from '../components/ChecklistItem';
@@ -14,6 +14,11 @@ import {
 import { startScan, stopScan, scanAllDevices } from '../services/bleListener';
 import { recordWeightAndUpdateEMA } from '../services/trendEngine';
 import { colors, font } from '../theme';
+
+// ─── Idle orb sizes ───────────────────────────────────────────────────────────
+const IDLE_ORB   = 240;
+const IDLE_MID   = 160;
+const IDLE_INNER = 92;
 
 const TAGS = [
   { tag: 'salty food',   emoji: '🧂' },
@@ -40,10 +45,13 @@ export function RitualScreen() {
 
   const [checklistItems, setChecklistItems] = React.useState<ChecklistItemType[]>([]);
   const [bleStatusText, setBleStatusText] = React.useState('Searching for your scale…');
-  const successScale = useRef(new Animated.Value(0)).current;
+  const successScale  = useRef(new Animated.Value(0)).current;
+  const dawnScale     = useRef(new Animated.Value(1)).current;
+  const dawnOpacity   = useRef(new Animated.Value(0.25)).current;
 
-  const pendingWeight    = useRef<number | null>(null);
-  const pendingTimestamp = useRef<string | null>(null);
+  const pendingWeight      = useRef<number | null>(null);
+  const pendingTimestamp   = useRef<string | null>(null);
+  const ritualCompleteRef  = useRef(true);
 
   useEffect(() => { setChecklistItems(getChecklistItems()); }, []);
 
@@ -59,9 +67,30 @@ export function RitualScreen() {
     return () => { if (ritualPhase === 'AWAITING_SCALE') stopScan(); };
   }, [ritualPhase]);
 
+  useEffect(() => {
+    if (ritualPhase !== 'IDLE') return;
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(dawnScale,   { toValue: 1.07, duration: 4800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(dawnOpacity, { toValue: 0.55, duration: 4800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(dawnScale,   { toValue: 1,    duration: 4800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(dawnOpacity, { toValue: 0.25, duration: 4800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ]),
+      ])
+    );
+    dawnScale.setValue(1);
+    dawnOpacity.setValue(0.25);
+    anim.start();
+    return () => anim.stop();
+  }, [ritualPhase]);
+
   const allChecked = checklistItems.length > 0 && checklistItems.every((item) => checkedItems.has(item.id));
 
-  function handleStartScale() {
+  function handleStartScale(ideal = true) {
+    ritualCompleteRef.current = ideal;
     setRitualPhase('AWAITING_SCALE');
     startScan({
       onStatus: (status) => {
@@ -93,7 +122,7 @@ export function RitualScreen() {
   function handleFinishNotes() {
     if (pendingWeight.current !== null && pendingTimestamp.current !== null) {
       const notes = ritualNotes.trim() || undefined;
-      const id = insertMeasurement(pendingWeight.current, pendingTimestamp.current, true, notes);
+      const id = insertMeasurement(pendingWeight.current, pendingTimestamp.current, ritualCompleteRef.current, notes);
       if (id !== -1 && selectedTags.length > 0) insertContextTags(id, selectedTags);
       pendingWeight.current = null;
       pendingTimestamp.current = null;
@@ -104,15 +133,43 @@ export function RitualScreen() {
   // ─── IDLE ────────────────────────────────────────────────────────────────────
   if (ritualPhase === 'IDLE') {
     return (
-      <View style={[styles.screen, styles.centered]}>
-        <Text style={styles.idleEmoji}>🌅</Text>
-        <Text style={styles.idleTitle}>Morning Ritual</Text>
-        <Text style={styles.idleSub}>
-          A consistent weigh-in routine is what makes the trend trustworthy.
-        </Text>
-        <TouchableOpacity style={styles.button} onPress={() => setRitualPhase('CHECKLIST')}>
-          <Text style={styles.buttonText}>Begin</Text>
-        </TouchableOpacity>
+      <View style={styles.idleScreen}>
+        {/* Upper: orb + text */}
+        <View style={styles.idleUpper}>
+          {/* Dormant pulse orb */}
+          <View style={styles.idleOrb}>
+            <Animated.View style={[
+              styles.idleOrbOuter,
+              { transform: [{ scale: dawnScale }], opacity: dawnOpacity },
+            ]} />
+            <View style={styles.idleOrbMid} />
+            <View style={styles.idleOrbInner} />
+            <View style={styles.idleOrbCore} />
+          </View>
+
+          {/* Text block */}
+          <View style={styles.idleTextBlock}>
+            <Text style={styles.idleEyebrow}>MORNING RITUAL</Text>
+            <Text style={styles.idleTitle}>
+              Begin with{'\n'}intention.
+            </Text>
+            <View style={styles.idleRule} />
+            <Text style={styles.idleSub}>
+              A consistent weigh-in routine is what{'\n'}makes the trend trustworthy.
+            </Text>
+          </View>
+        </View>
+
+        {/* Begin button */}
+        <View style={styles.idleButtonArea}>
+          <TouchableOpacity
+            style={styles.idleBeginButton}
+            onPress={() => setRitualPhase('CHECKLIST')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.idleBeginText}>Begin</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -136,9 +193,12 @@ export function RitualScreen() {
         <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.button, !allChecked && styles.buttonDisabled]}
-            onPress={handleStartScale} disabled={!allChecked}
+            onPress={() => handleStartScale(true)} disabled={!allChecked}
           >
             <Text style={styles.buttonText}>Step on Scale →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logAnywayLink} onPress={() => handleStartScale(false)}>
+            <Text style={styles.logAnywayText}>Log anyway — already eaten or off schedule</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -169,7 +229,7 @@ export function RitualScreen() {
       <View style={styles.screen}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.phaseLabel}>Context</Text>
-          <Text style={styles.phaseTitle}>Anything relevant{'\n'}today?</Text>
+          <Text style={styles.phaseTitle}>Anything relevant in{'\n'}the last 24hrs?</Text>
           <Text style={styles.phaseSub}>Tags help explain any unusual swings. Skip if nothing applies.</Text>
           <View style={styles.tagGrid}>
             {TAGS.map((t) => (
@@ -231,9 +291,118 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', padding: 32 },
   scrollContent: { padding: 24, paddingBottom: 120 },
 
-  idleEmoji: { fontSize: 48, marginBottom: 20 },
-  idleTitle: { color: colors.textPrimary, fontSize: 30, fontFamily: font.display, marginBottom: 12 },
-  idleSub: { color: colors.textSecondary, fontSize: 15, fontFamily: font.body, lineHeight: 22, textAlign: 'center', marginBottom: 40 },
+  // ── Idle screen ──────────────────────────────────────────────────────────────
+  idleScreen: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  idleUpper: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 44,
+  },
+
+  // Dormant pulse orb
+  idleOrb: {
+    width: IDLE_ORB,
+    height: IDLE_ORB,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  idleOrbOuter: {
+    position: 'absolute',
+    width: IDLE_ORB,
+    height: IDLE_ORB,
+    borderRadius: IDLE_ORB / 2,
+    borderWidth: 1,
+    borderColor: colors.accent + '55',
+    top: 0,
+    left: 0,
+  },
+  idleOrbMid: {
+    position: 'absolute',
+    width: IDLE_MID,
+    height: IDLE_MID,
+    borderRadius: IDLE_MID / 2,
+    borderWidth: 1,
+    borderColor: colors.accent + '40',
+    backgroundColor: 'rgba(200, 131, 30, 0.04)',
+    top: (IDLE_ORB - IDLE_MID) / 2,
+    left: (IDLE_ORB - IDLE_MID) / 2,
+  },
+  idleOrbInner: {
+    position: 'absolute',
+    width: IDLE_INNER,
+    height: IDLE_INNER,
+    borderRadius: IDLE_INNER / 2,
+    borderWidth: 1,
+    borderColor: colors.accent + '50',
+    backgroundColor: 'rgba(200, 131, 30, 0.08)',
+    top: (IDLE_ORB - IDLE_INNER) / 2,
+    left: (IDLE_ORB - IDLE_INNER) / 2,
+  },
+  idleOrbCore: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.accent,
+    opacity: 0.65,
+  },
+
+  // Text block
+  idleTextBlock: {
+    alignItems: 'center',
+  },
+  idleEyebrow: {
+    color: colors.textTertiary,
+    fontSize: 10,
+    fontFamily: font.bodySemiBold,
+    letterSpacing: 2.5,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+  },
+  idleTitle: {
+    color: colors.textPrimary,
+    fontSize: 42,
+    fontFamily: font.displayItalic,
+    textAlign: 'center',
+    lineHeight: 50,
+    marginBottom: 20,
+  },
+  idleRule: {
+    width: 36,
+    height: 1,
+    backgroundColor: colors.accent,
+    opacity: 0.45,
+    marginBottom: 16,
+  },
+  idleSub: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontFamily: font.body,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+
+  // Begin button
+  idleButtonArea: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  idleBeginButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  idleBeginText: {
+    color: colors.white,
+    fontSize: 17,
+    fontFamily: font.bodySemiBold,
+    letterSpacing: 0.3,
+  },
 
   phaseLabel: { color: colors.textTertiary, fontSize: 11, fontFamily: font.bodySemiBold, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 },
   phaseTitle: { color: colors.textPrimary, fontSize: 30, fontFamily: font.display, marginBottom: 8, lineHeight: 36 },
@@ -257,6 +426,8 @@ const styles = StyleSheet.create({
     borderRadius: 14, paddingVertical: 16, alignItems: 'center',
   },
   buttonDisabled: { backgroundColor: colors.card, opacity: 0.5 },
+  logAnywayLink: { alignItems: 'center', paddingTop: 14 },
+  logAnywayText: { color: colors.textTertiary, fontSize: 13, fontFamily: font.body, textDecorationLine: 'underline' },
   buttonText: { color: colors.white, fontSize: 16, fontFamily: font.bodySemiBold },
 
   successCircle: {
